@@ -7,6 +7,27 @@
 # Removal and connection should depend just on the previous day (maybe later we can allow memory beyond that)
 
 library(igraph)
+library(tidyverse)
+n <- 30
+density <- 0.15
+seed <- 3
+r <- 0.1
+c <- 0.05
+days <- 10
+
+set.seed(seed)
+initialConnections <- sample(0:1, size = n*n, replace = T, prob = c(1-density, density))
+
+# Create the initial adjacency matrix
+am_init <- matrix(data = initialConnections, nrow = n, ncol = n)
+init_graph <- graph_from_adjacency_matrix(am_init, weighted = NULL, mode = "undirected", diag = FALSE)
+
+# Name nodes
+V(init_graph)$name <- paste0("n", 1:n)
+
+#Get the coordinates of the Nodes
+coords <- layout_with_fr(init_graph) %>% 
+  bind_cols(tibble(names = names(V(init_graph))))
 
 # Loss and gain of edges --------------------------------------------------
 generateAMs <- function(n, density, seed, r, c, days){
@@ -16,7 +37,7 @@ generateAMs <- function(n, density, seed, r, c, days){
   
   # Create the initial adjacency matrix
   am_init <- matrix(data = initialConnections, nrow = n, ncol = n)
-  
+
   # For each day, remove r connections and create c connections
   ams <- vector(mode = "list", length = days) # create a list to store the adjacency matrices
   ams[[1]] <- am_init
@@ -40,4 +61,7 @@ generateAMs <- function(n, density, seed, r, c, days){
 
 ams <- generateAMs(n = 20, density = 0.1, seed = 3, r = 0.1, c = 0.05, days = 10)
 graphs <- lapply(ams, graph_from_adjacency_matrix, weighted = NULL, mode = "undirected", diag = FALSE)
-lapply(graphs, plot)
+lapply(graphs, function(x){
+  plot(x, vertex.size = .8, edge.arrow.size=.4, vertex.label = NA, 
+       layout = as.matrix(coords[,1:2]), rescale=F)
+})
