@@ -129,3 +129,19 @@ stats <- lapply(gs, function(x){
     mutate(centr = centrality_degree(),
            deg = degree(.))
 })
+
+# Create a single weighted adjacency matrix from all of them
+weighted <- Reduce("+", ams) %>% 
+  as_tbl_graph() %>%
+  activate(nodes) %>%
+  mutate(name = 1:n) %>%
+  mutate(deg = degree(.)) %>%
+  mutate(str = strength(.))
+
+weighted %>%
+  ggraph(layout = "auto")+
+  geom_edge_link(aes(width = weight))+
+  geom_node_point(aes(col = deg), size = 5)+
+  scale_edge_width(range = c(0.1, 1))+
+  geom_node_text(aes(label = name), col = "white", size = 2)+
+  theme_graph()
