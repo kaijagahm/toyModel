@@ -4,17 +4,19 @@
 library(tidyverse)
 library(igraph)
 library(ggraph)
-library(tidygraph)
 library(dils) # for filling in the edge list
+library(tidygraph)
+library(data.table)
 
 # Define parametesr
 tmax <- 10 # simulation time
-n <- 40 # number of nodes
+n <- 60 # number of nodes
 pint <- 0.4 # mean of the initial interaction probability distribution (base probability). How likely to interact.
 iter <- 1
 m <- 100 # number of interactions in each time step
 
 # Start interaction loop
+
 for(i in 1:iter){ # for each simulation
   
   # Initialize nodes to zeros state (done once at the beginning of the simulation)
@@ -24,8 +26,8 @@ for(i in 1:iter){ # for each simulation
               nInt = 0) # number of interactions this node had
   
   # Initialize lists to store the adjacency matrices and graphs
-  ams <- vector(mode = "list", length = day)
-  gs <- vector(mode = "list", length = day)
+  ams <- vector(mode = "list", length = tmax)
+  gs <- vector(mode = "list", length = tmax)
   
   for(day in 1:tmax){
     cat(paste("day", day, "\n"))
@@ -82,7 +84,13 @@ for(i in 1:iter){ # for each simulation
     
     # Save adjacency matrix
     ams[[day]] <- am
-    gs[[day]] <- graph_from_adjacency_matrix(am, mode = "undirected", diag = FALSE)
+    # Name nodes
+    gs <- graph_from_adjacency_matrix(am, mode = "undirected", diag = FALSE) %>%
+      as_tbl_graph() %>%
+      activate(nodes) %>%
+      mutate(name = 1:n)
+    # Save to list
+    gs[[day]] <- gs
     
     # Calculate per-node stats for this day of interactions
     interactingNodes <- as.data.frame(interactions) %>%
@@ -103,13 +111,6 @@ for(i in 1:iter){ # for each simulation
   } # close day
 } # close simulation iteration
 
-gs <- lapply(gs, function(x){
-  x %>%
-    as_tbl_graph() %>%
-    activate(nodes) %>%
-    mutate(name = 1:n)
-})
-
 # Create coordinates to use for plotting based on the optimal layout on the first day.
 layoutCoords <- layout_with_fr(gs[[1]])
 
@@ -121,23 +122,56 @@ lapply(gs, function(x){
     geom_node_text(aes(label = name, vjust = 0.5), col = "black")
   })
 
-# Calculate node-level stats 
-stats <- lapply(gs, function(x){
-  x %>% 
+getNodeStats <- function(gs, type = "df"){
+  # Check to make sure the "type" argument is valid
+  if(!(type %in% c("df", "graphs", "list"))){
+    stop("Argument 'type' must be 'df', 'graphs', or 'list'.")
+  }
+  
+  # Calculate stats
+  stats <- lapply(gs, function(x){
+    x %>% 
+      as_tbl_graph() %>%
+      activate(nodes) %>%
+      mutate(centr = centrality_degree(),
+             deg = degree(.))
+  })
+  
+  # Extract just the node data, making a list of data frames
+  statsDFList <- lapply(stats, function(x){
+    x %>% activate(nodes) %>% as.data.frame()
+  })
+  
+  # Compress the list of data frames into a single df
+  statsDF <- data.table::rbindlist(statsDFList, idcol = "Day")
+  
+  # Return different things based on what the user wants
+  if(type == "df"){
+    return(statsDF)
+  }else if(type == "list"){
+    return(statsDFList)
+  }else if(type == "graphs"){
+    return(stats)
+  }
+}
+
+collapseAM <- function(ams){
+  weighted <- Reduce("+", ams) %>% 
     as_tbl_graph() %>%
     activate(nodes) %>%
-    mutate(centr = centrality_degree(),
-           deg = degree(.))
-})
+    mutate(name = 1:n) %>%
+    mutate(deg = degree(.)) %>%
+    mutate(str = strength(.))
+  
+  return(weighted)
+}
 
-# Create a single weighted adjacency matrix from all of them
-weighted <- Reduce("+", ams) %>% 
-  as_tbl_graph() %>%
-  activate(nodes) %>%
-  mutate(name = 1:n) %>%
-  mutate(deg = degree(.)) %>%
-  mutate(str = strength(.))
+stats <- getNodeStats(gs, type = "graphs")
+nodeData <- getNodeStats(gs, type = "list")
+nodeDataDF <- getNodeStats(gs, type = "df")
+weighted <- collapseAM(ams)
 
+# Plot the weighted adjacency matrix
 weighted %>%
   ggraph(layout = "auto")+
   geom_edge_link(aes(width = weight))+
@@ -145,3 +179,19 @@ weighted %>%
   scale_edge_width(range = c(0.1, 1))+
   geom_node_text(aes(label = name), col = "white", size = 2)+
   theme_graph()
+
+# Plot degree distributions
+# Now use this to plot
+nodeDataDF %>%
+  ggplot(aes(x = deg, group = Day, color = Day))+
+  geom_density()+
+  theme_minimal()+
+  theme(axis.title.y = element_blank())+
+  xlab("Degree")
+# The probability of association doesn't change day to day, so it makes sense that all our distributions are basically the same.
+
+
+# How does mean degree change depending on interaction prob? --------------
+probsToTest <- c(0.1, 0.3, 0.5, 0.7)
+
+
