@@ -45,9 +45,7 @@ runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, m = 10000, simpleOut
       
       # Interact each node with each other node
       for(nodeA in 1:n){ 
-        for(nodeB in (nodeA+1):n){ # don't need to do the dyads twice; hence nodeA+1
-          # Ignore impossible values of nodeB
-          if(nodeB > n) next
+        for(nodeB in 1:n){
           # Calculate the probability of the two nodes meeting
           probMeeting <- nodes[nodeA, "intProb"]*nodes[nodeB, "intProb"]
           if(runif(1) < probMeeting){ # random draw between 0 and 1
