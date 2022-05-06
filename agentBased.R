@@ -16,7 +16,7 @@ iter <- 1
 m <- 100 # number of interactions in each time step
 
 # Start interaction loop
-runSim <- function(iter, tmax, n, pint, m){
+runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, m = 10000, simpleOutput = T){
   outputs <- vector(mode = "list", length = iter) # store stuff
   
   for(i in 1:iter){ # for each simulation
@@ -91,12 +91,12 @@ runSim <- function(iter, tmax, n, pint, m){
       # Save adjacency matrix
       ams[[day]] <- am
       # Name nodes
-      gs <- graph_from_adjacency_matrix(am, mode = "undirected", diag = FALSE) %>%
+      g <- graph_from_adjacency_matrix(am, mode = "undirected", diag = FALSE) %>%
         as_tbl_graph() %>%
         activate(nodes) %>%
         mutate(name = 1:n)
       # Save to list
-      gs[[day]] <- gs
+      gs[[day]] <- g
       
       # Calculate per-node stats for this day of interactions
       interactingNodes <- as.data.frame(interactions) %>%
@@ -116,25 +116,32 @@ runSim <- function(iter, tmax, n, pint, m){
     } # close day
     
     # Save the outputs for this iteration of the simulation
-    outputs[[i]] <- list(nodes, ams, gs)
+    outputs[[i]] <- list("nodes" = nodes, "ams" = ams, "gs" = gs)
   } # close simulation iteration
   
-  return(outputs) # a massive list of lists
+  names(outputs) <- paste0("iter", 1:iter)
+  
+  # If only one iteration, return a list with one less level of complexity.
+  if(iter == 1 & simpleOutput == T){
+    message("Returning simplified output")
+    return(outputs[[1]])
+  }else{
+    return(outputs) # a massive list of lists
+  }
 }
 
-sim <- runSim(iter = 1, tmax = 10, n = 60, pint = 0.4, m = 100)
-
+sim <- runSim(iter = 1, tmax = 10, n = 60, pint = 0.4, m = 100, simpleOutput = T)
 
 # Create coordinates to use for plotting based on the optimal layout on the first day.
-layoutCoords <- layout_with_fr(gs[[1]])
+layoutCoords <- layout_with_fr(sim$gs[[1]])
 
 # Make a bunch of plots with the same layout
-lapply(gs, function(x){
+lapply(sim$gs, function(x){
   x %>% ggraph(layout = layoutCoords)+
     geom_edge_link(edge_width = 0.2)+
     geom_node_point(col = "steelblue", size = 5)+
     geom_node_text(aes(label = name, vjust = 0.5), col = "black")
-  })
+})
 
 getNodeStats <- function(gs, type = "df"){
   # Check to make sure the "type" argument is valid
@@ -147,7 +154,7 @@ getNodeStats <- function(gs, type = "df"){
     x %>% 
       as_tbl_graph() %>%
       activate(nodes) %>%
-      mutate(centr = centrality_degree(),
+      mutate(centr = centrality_eigen(),
              deg = degree(.))
   })
   
@@ -180,10 +187,10 @@ collapseAM <- function(ams){
   return(weighted)
 }
 
-stats <- getNodeStats(gs, type = "graphs")
-nodeData <- getNodeStats(gs, type = "list")
-nodeDataDF <- getNodeStats(gs, type = "df")
-weighted <- collapseAM(ams)
+stats <- getNodeStats(sim$gs, type = "graphs")
+nodeData <- getNodeStats(sim$gs, type = "list")
+nodeDataDF <- getNodeStats(sim$gs, type = "df")
+weighted <- collapseAM(sim$ams)
 
 # Plot the weighted adjacency matrix
 weighted %>%
@@ -206,6 +213,75 @@ nodeDataDF %>%
 
 
 # How does mean degree change depending on interaction prob? --------------
-probsToTest <- c(0.1, 0.3, 0.5, 0.7)
+probsToTest <- seq(from = 0.01, to = 0.99, by = 0.01)
+simOutputs <- vector(mode = "list", length = length(probsToTest))
 
+for(i in 1:length(probsToTest)){
+  sim <- runSim(iter = 1, tmax = 10, n = 60, pint = probsToTest[i], m = 100, simpleOutput = T)
+  simOutputs[[i]] <- sim
+}
+
+# Get all the graphs
+gsList <- lapply(simOutputs, function(x){
+  x[["gs"]]
+})
+
+# Compute the node stats
+nodeDataDFs <- lapply(gsList, function(x){
+  getNodeStats(x, type = "df")
+})
+
+nodeDataAllSims <- map2(.x = nodeDataDFs, .y = probsToTest, 
+                        .f = function(.x, .y){
+                          .x %>% mutate(intProb = .y)
+                        }) %>%
+  data.table::rbindlist() %>% as.data.frame()
+
+# Now we can finally plot
+# Degree
+nodeDataAllSims %>%
+  filter(Day == 1) %>% # we only need the first day's data because all days are the same
+  ggplot(aes(x = intProb, y = deg))+
+  geom_point(size = 0.6, alpha = 0.2)+
+  geom_smooth()+
+  theme_minimal()+
+  ylab("Degree")+ # high degree means the node is connected to many other nodes
+  xlab("Interaction probability")+
+  theme(text = element_text(size = 20))
+
+# Centrality
+nodeDataAllSims %>%
+  filter(Day == 1) %>% # we only need the first day's data because all days are the same
+  ggplot(aes(x = intProb, y = centr))+
+  geom_point(size = 0.6, alpha = 0.2)+
+  geom_smooth()+
+  theme_minimal()+
+  ylab("Eigenvector centrality")+ # high EC means the node is connected to many well-connected nodes
+  xlab("Interaction probability")+
+  theme(text = element_text(size = 20))
+
+# Network edge density
+densityList <- lapply(gsList, function(x){
+  lapply(x, edge_density) %>% 
+    unlist() %>% 
+    as.data.frame() %>%
+    setNames("density")
+})
+
+densities <- densityList %>% 
+  map2(., probsToTest, function(.x, .y){
+    .x %>%
+      mutate(intProb = .y)
+  }) %>%
+  data.table::rbindlist() %>%
+  as.data.frame()
+
+densities %>%
+  ggplot(aes(x = intProb, y = density))+
+  geom_point(size = 0.6, alpha = 0.2)+
+  geom_smooth()+
+  theme_minimal()+
+  ylab("Network Density")+ 
+  xlab("Interaction probability")+
+  theme(text = element_text(size = 20))
 
