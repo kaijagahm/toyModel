@@ -13,9 +13,10 @@ tmax <- 10 # simulation time
 n <- 60 # number of nodes
 pint <- 0.4 # mean of the initial interaction probability distribution (base probability). How likely to interact.
 iter <- 1
+m <- 100 # number of interactions in each time step
 
 # Start interaction loop
-runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, simpleOutput = T){
+runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, m = 10000, simpleOutput = T){
   outputs <- vector(mode = "list", length = iter) # store stuff
   
   for(i in 1:iter){ # for each simulation
@@ -44,7 +45,9 @@ runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, simpleOutput = T){
       
       # Interact each node with each other node
       for(nodeA in 1:n){ 
-        for(nodeB in 1:n){
+        for(nodeB in (nodeA+1):n){ # don't need to do the dyads twice; hence nodeA+1
+          # Ignore impossible values of nodeB
+          if(nodeB > n) next
           # Calculate the probability of the two nodes meeting
           probMeeting <- nodes[nodeA, "intProb"]*nodes[nodeB, "intProb"]
           if(runif(1) < probMeeting){ # random draw between 0 and 1
@@ -53,6 +56,25 @@ runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, simpleOutput = T){
             interactions <- rbind(interactions, c(nodeA, nodeB, 1)) # the nodes and their weight
           }
         }
+      }
+      
+      # Check that we haven't exceeded the number of allowed interactions per day
+      # If we have, remove some interactions at random.
+      if(nrow(interactions) > m){
+        # how many interactions do we need to remove?
+        howManyToRemove <- nrow(interactions) - m
+        # select random rows to remove
+        whichToRemove <- sample(1:nrow(interactions),
+                                size = howManyToRemove)
+        
+        # remove from adjacency matrix first
+        for(k in 1:length(whichToRemove)){
+          if(am[interactions[k,1], interactions[k,2]] > 0){
+            am[interactions[k,1], interactions[k,2]] <- am[interactions[k,1], interactions[k,2]] - 1
+          }
+        }
+        # ...and now remove the rows from the edge list
+        interactions <- interactions[-whichToRemove,]
       }
       
       # We don't want to allow any isolated nodes. If there's a node that isn't connected to anyone, add one random edge.
@@ -108,7 +130,7 @@ runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, simpleOutput = T){
   }
 }
 
-sim <- runSim(iter = 1, tmax = 10, n = 60, pint = 0.4, simpleOutput = T)
+sim <- runSim(iter = 1, tmax = 10, n = 60, pint = 0.4, m = 100, simpleOutput = T)
 
 # Create coordinates to use for plotting based on the optimal layout on the first day.
 layoutCoords <- layout_with_fr(sim$gs[[1]])
@@ -195,7 +217,7 @@ probsToTest <- seq(from = 0.01, to = 0.99, by = 0.01)
 simOutputs <- vector(mode = "list", length = length(probsToTest))
 
 for(i in 1:length(probsToTest)){
-  sim <- runSim(iter = 1, tmax = 10, n = 60, pint = probsToTest[i], simpleOutput = T)
+  sim <- runSim(iter = 1, tmax = 10, n = 60, pint = probsToTest[i], m = 100, simpleOutput = T)
   simOutputs[[i]] <- sim
 }
 
