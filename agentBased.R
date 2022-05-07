@@ -15,99 +15,93 @@ pint <- 0.4 # mean of the initial interaction probability distribution (base pro
 iter <- 1
 
 # Start interaction loop
-runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, simpleOutput = T){
-  outputs <- vector(mode = "list", length = iter) # store stuff
+runSim <- function(tmax = 10, n = 50, pint = 0.4){
   
-  for(i in 1:iter){ # for each simulation
-    # ***There are going to be three outputs: nodes, ams, gs. ***
-    # Initialize nodes to zeros state (done once at the beginning of the simulation)
-    # 1. NODES ***
-    nodes <- data.frame(nodeID = 1:n, # assign each node an ID
-                        intProb = pint, # interaction probability
-                        timeFromLastInt = 0, # number of time steps since node's last encounter with another node
-                        nInt = 0) # number of interactions this node had
+  # ***There are going to be three outputs: nodes, ams, gs. ***
+  # Initialize nodes to zeros state (done once at the beginning of the simulation)
+  # 1. NODES ***
+  nodes <- data.frame(nodeID = 1:n, # assign each node an ID
+                      intProb = pint, # interaction probability
+                      timeFromLastInt = 0, # number of time steps since node's last encounter with another node
+                      nInt = 0) # number of interactions this node had
+  
+  # Initialize lists to store the graphs, interactions, and node-level data
+  # 1. Graphs
+  gs <- vector(mode = "list", length = tmax) # graphs
+  
+  # 2. Interactions
+  ints <- vector(mode = "list", length = tmax) # interaction edge lists
+  
+  # 3. Node-level data
+  nodeData <- vector(mode = "list", length = tmax) # node data
+  
+  # Run the simulation for the number of days
+  for(day in 1:tmax){
+    cat(paste("day", day, "\n"))
     
-    # Initialize lists to store the adjacency matrices and graphs
-    # 2. AMS ***
-    ams <- vector(mode = "list", length = tmax) # adjacency matrices
-    # 3. GS *** 
-    gs <- vector(mode = "list", length = tmax) # graphs
+    # Randomize which nodes interact on this day
+    # empty adjacency matrix to fill with interactions
+    interactions <- matrix(nrow = 0, ncol = 2) 
     
-    # Run the simulation for the number of days
-    for(day in 1:tmax){
-      cat(paste("day", day, "\n"))
-      
-      # Randomize which nodes interact on this day
-      # empty adjacency matrix to fill with interactions
-      interactions <- matrix(nrow = 0, ncol = 2) 
-      
-      # Interact each node with each other node
-      for(nodeA in 1:n){ 
-        for(nodeB in (nodeA+1):n){ # don't need to do the dyads twice; hence nodeA+1
-          # Ignore impossible values of nodeB
-          if(nodeB > n) next
-          if(nodeB == nodeA) next # no self edges!
-          # Calculate the probability of the two nodes meeting
-          probMeeting <- nodes[nodeA, "intProb"]*nodes[nodeB, "intProb"]
-          if(runif(1) < probMeeting){ # random draw between 0 and 1
-            # make an edge list
-            interactions <- rbind(interactions, c(nodeA, nodeB)) # the nodes and their weight
-          }
+    # Interact each node with each other node
+    for(nodeA in 1:n){ 
+      for(nodeB in (nodeA+1):n){ # don't need to do the dyads twice; hence nodeA+1
+        # Ignore impossible values of nodeB
+        if(nodeB > n) next
+        if(nodeB == nodeA) next # no self edges!
+        # Calculate the probability of the two nodes meeting
+        probMeeting <- nodes[nodeA, "intProb"]*nodes[nodeB, "intProb"]
+        if(runif(1) < probMeeting){ # random draw between 0 and 1
+          # make an edge list
+          interactions <- rbind(interactions, c(nodeA, nodeB)) # the nodes and their weight
         }
       }
-
-      # We don't want to allow any isolated nodes. If there's a node that isn't connected to anyone, add one random edge.
-      for(node in 1:n){
-        if(!(node %in% interactions[,1]) & !(node %in% interactions[,2])){
-          allNodes <- 1:n # all nodes
-          others <- allNodes[allNodes != node] # remove self from vector of possibilities
-          toAdd <- sample(others, 1) # pick one node to join the unconnected node to
-          interactions <- rbind(interactions, c(node, toAdd)) # add to edge list
-        }
-      }
-      
-      # Convert interactions to a full adjacency matrix, including any nodes that didn't interact
-      g <- graph_from_data_frame(interactions, vertices = nodes[,"nodeID"], directed = F) %>%
-        as_tbl_graph() %>%
-        activate(nodes) %>%
-        mutate(name = 1:n) # name the nodes
-      
-      # Save to list
-      gs[[day]] <- g
-      
-      # Calculate per-node stats for this day of interactions
-      interactingNodes <- as.data.frame(interactions) %>%
-        pivot_longer(cols = 1:2) %>%
-        pull() %>% as.integer() %>% sort() # get non-unique vector of all nodes that interacted
-      
-      for(r in 1:nrow(nodes)){
-        if(nodes[r, "nodeID"] %in% interactingNodes){
-          nodes[r, "nInt"] <- nodes[r, "nInt"] + sum(interactingNodes == r) # add number of interactions from today
-        }
-        if(nodes[r, "nodeID"] %in% interactingNodes){
-          nodes[r, "timeFromLastInt"] <- 0
-        }else{
-          nodes[r, "timeFromLastInt"] <- nodes[r, "timeFromLastInt"] + 1
-        }
-      }
-    } # close day
+    }
     
-    # Save the outputs for this iteration of the simulation
-    outputs[[i]] <- list("nodes" = nodes, "ams" = ams, "gs" = gs)
-  } # close simulation iteration
+    # We don't want to allow any isolated nodes. If there's a node that isn't connected to anyone, add one random edge.
+    for(node in 1:n){
+      if(!(node %in% interactions[,1]) & !(node %in% interactions[,2])){
+        allNodes <- 1:n # all nodes
+        others <- allNodes[allNodes != node] # remove self from vector of possibilities
+        toAdd <- sample(others, 1) # pick one node to join the unconnected node to
+        interactions <- rbind(interactions, c(node, toAdd)) # add to edge list
+      }
+    }
+    
+    # Convert interactions to a full adjacency matrix, including any nodes that didn't interact
+    g <- graph_from_data_frame(interactions, vertices = nodes[,"nodeID"], directed = F) %>%
+      as_tbl_graph() %>%
+      activate(nodes) %>%
+      mutate(name = 1:n) # name the nodes
+    
+    # Calculate per-node stats for this day of interactions
+    interactingNodes <- as.data.frame(interactions) %>%
+      pivot_longer(cols = 1:2) %>%
+      pull() %>% as.integer() %>% sort() # get non-unique vector of all nodes that interacted
+    
+    for(r in 1:nrow(nodes)){
+      if(nodes[r, "nodeID"] %in% interactingNodes){
+        nodes[r, "nInt"] <- nodes[r, "nInt"] + sum(interactingNodes == r) # add number of interactions from today
+      }
+      if(nodes[r, "nodeID"] %in% interactingNodes){
+        nodes[r, "timeFromLastInt"] <- 0
+      }else{
+        nodes[r, "timeFromLastInt"] <- nodes[r, "timeFromLastInt"] + 1
+      }
+    }
+    
+    # Save to list
+    gs[[day]] <- g
+    ints[[day]] <- interactions
+    nodeData[[day]] <- nodes
+    
+  } # close day
   
-  names(outputs) <- paste0("iter", 1:iter)
-  
-  # If only one iteration, return a list with one less level of complexity.
-  if(iter == 1 & simpleOutput == T){
-    message("Returning simplified output")
-    return(outputs[[1]])
-  }else{
-    return(outputs) # a massive list of lists
-  }
+  outputList <- list("gs" = gs, "interactions" = ints, "nodeData" = nodeData)
+  return(outputList)
 }
 
-sim <- runSim(iter = 1, tmax = 10, n = 60, pint = 0.4, simpleOutput = T)
+sim <- runSim(tmax = 10, n = 60, pint = 0.4)
 
 # Create coordinates to use for plotting based on the optimal layout on the first day.
 layoutCoords <- layout_with_fr(sim$gs[[1]])
@@ -137,11 +131,13 @@ getNodeStats <- function(gs, type = "df"){
   
   # Extract just the node data, making a list of data frames
   statsDFList <- lapply(stats, function(x){
-    x %>% activate(nodes) %>% as.data.frame()
+    x %>% activate(nodes) %>% 
+      as.data.frame()
   })
   
   # Compress the list of data frames into a single df
-  statsDF <- data.table::rbindlist(statsDFList, idcol = "Day")
+  statsDF <- data.table::rbindlist(statsDFList, idcol = "Day") %>% 
+    as.data.frame()
   
   # Return different things based on what the user wants
   if(type == "df"){
@@ -153,30 +149,9 @@ getNodeStats <- function(gs, type = "df"){
   }
 }
 
-collapseAM <- function(ams){
-  weighted <- Reduce("+", ams) %>% 
-    as_tbl_graph() %>%
-    activate(nodes) %>%
-    mutate(name = 1:n) %>%
-    mutate(deg = degree(.)) %>%
-    mutate(str = strength(.))
-  
-  return(weighted)
-}
-
 stats <- getNodeStats(sim$gs, type = "graphs")
 nodeData <- getNodeStats(sim$gs, type = "list")
 nodeDataDF <- getNodeStats(sim$gs, type = "df")
-weighted <- collapseAM(sim$ams)
-
-# Plot the weighted adjacency matrix
-weighted %>%
-  ggraph(layout = "auto")+
-  geom_edge_link(aes(width = weight))+
-  geom_node_point(aes(col = deg), size = 5)+
-  scale_edge_width(range = c(0.1, 1))+
-  geom_node_text(aes(label = name), col = "white", size = 2)+
-  theme_graph()
 
 # Plot degree distributions
 # Now use this to plot
@@ -194,7 +169,7 @@ probsToTest <- seq(from = 0.01, to = 0.99, by = 0.01)
 simOutputs <- vector(mode = "list", length = length(probsToTest))
 
 for(i in 1:length(probsToTest)){
-  sim <- runSim(iter = 1, tmax = 10, n = 60, pint = probsToTest[i], simpleOutput = T)
+  sim <- runSim(tmax = 10, n = 60, pint = probsToTest[i])
   simOutputs[[i]] <- sim
 }
 
