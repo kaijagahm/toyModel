@@ -39,8 +39,7 @@ runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, simpleOutput = T){
       
       # Randomize which nodes interact on this day
       # empty adjacency matrix to fill with interactions
-      am <- matrix(data = 0, nrow = n, ncol = n) 
-      interactions <- matrix(nrow = 0, ncol = 3) 
+      interactions <- matrix(nrow = 0, ncol = 2) 
       
       # Interact each node with each other node
       for(nodeA in 1:n){ 
@@ -51,31 +50,28 @@ runSim <- function(iter = 1, tmax = 10, n = 50, pint = 0.4, simpleOutput = T){
           # Calculate the probability of the two nodes meeting
           probMeeting <- nodes[nodeA, "intProb"]*nodes[nodeB, "intProb"]
           if(runif(1) < probMeeting){ # random draw between 0 and 1
-            am[nodeA, nodeB] <- am[nodeA, nodeB] + 1 # increment the adjacency matrix
-            # also make an edge list
-            interactions <- rbind(interactions, c(nodeA, nodeB, 1)) # the nodes and their weight
+            # make an edge list
+            interactions <- rbind(interactions, c(nodeA, nodeB)) # the nodes and their weight
           }
         }
       }
-      
+
       # We don't want to allow any isolated nodes. If there's a node that isn't connected to anyone, add one random edge.
       for(node in 1:n){
-        if(rowSums(am)[node] == 0){
+        if(!(node %in% interactions[,1]) & !(node %in% interactions[,2])){
           allNodes <- 1:n # all nodes
           others <- allNodes[allNodes != node] # remove self from vector of possibilities
           toAdd <- sample(others, 1) # pick one node to join the unconnected node to
-          am[node, toAdd] <- 1 # add to adjacency matrix
-          interactions <- rbind(interactions, c(node, toAdd, 1)) # add to edge list
+          interactions <- rbind(interactions, c(node, toAdd)) # add to edge list
         }
       }
       
-      # Save adjacency matrix
-      ams[[day]] <- am
-      # Name nodes
-      g <- graph_from_adjacency_matrix(am, mode = "undirected", diag = FALSE) %>%
+      # Convert interactions to a full adjacency matrix, including any nodes that didn't interact
+      g <- graph_from_data_frame(interactions, vertices = nodes[,"nodeID"], directed = F) %>%
         as_tbl_graph() %>%
         activate(nodes) %>%
-        mutate(name = 1:n)
+        mutate(name = 1:n) # name the nodes
+      
       # Save to list
       gs[[day]] <- g
       
