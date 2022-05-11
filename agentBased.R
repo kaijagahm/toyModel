@@ -103,7 +103,10 @@ runSim <- function(tmax = 10, n = 50, pint = 0.4, pNew = 0.1, pLose = 0.1){
   return(gs)
 }
 
-sim <- runSim(tmax = 10, n = 20, pint = 0.4, pNew = 0.3, pLose = 0.5)
+sim60 <- runSim(tmax = 10, n = 60, pint = 0.4, pNew = 0.3, pLose = 0.5)
+sim50 <- runSim(tmax = 10, n = 50, pint = 0.4, pNew = 0.3, pLose = 0.5)
+sim40 <- runSim(tmax = 10, n = 40, pint = 0.4, pNew = 0.3, pLose = 0.5)
+sim30 <- runSim(tmax = 10, n = 30, pint = 0.4, pNew = 0.3, pLose = 0.5)
 
 # Create coordinates to use for plotting based on the optimal layout on the first day.
 layoutCoords <- layout_with_fr(sim[[1]])
@@ -151,91 +154,16 @@ getNodeStats <- function(gs, type = "df"){
   }
 }
 
-stats <- getNodeStats(sim$gs, type = "graphs")
-nodeData <- getNodeStats(sim$gs, type = "list")
-nodeDataDF <- getNodeStats(sim$gs, type = "df")
+nodeDataDF60 <- getNodeStats(sim60, type = "df") %>% mutate(n = 60)
+nodeDataDF50 <- getNodeStats(sim50, type = "df") %>% mutate(n = 50)
+nodeDataDF40 <- getNodeStats(sim40, type = "df") %>% mutate(n = 40)
+nodeDataDF30 <- getNodeStats(sim30, type = "df") %>% mutate(n = 30)
+nd <- rbind(nodeDataDF60, nodeDataDF50, nodeDataDF40, nodeDataDF30)
 
-# Plot degree distributions
-# Now use this to plot
-nodeDataDF %>%
-  ggplot(aes(x = deg, group = Day, color = Day))+
-  geom_density()+
-  theme_minimal()+
-  theme(axis.title.y = element_blank())+
-  xlab("Degree")
-# The probability of association doesn't change day to day, so it makes sense that all our distributions are basically the same.
-
-
-# How does mean degree change depending on interaction prob? --------------
-probsToTest <- seq(from = 0.01, to = 0.99, by = 0.01)
-simOutputs <- vector(mode = "list", length = length(probsToTest))
-
-for(i in 1:length(probsToTest)){
-  sim <- runSim(tmax = 10, n = 60, pint = probsToTest[i])
-  simOutputs[[i]] <- sim
-}
-
-# Get all the graphs
-gsList <- lapply(simOutputs, function(x){
-  x[["gs"]]
-})
-
-# Compute the node stats
-nodeDataDFs <- lapply(gsList, function(x){
-  getNodeStats(x, type = "df")
-})
-
-nodeDataAllSims <- map2(.x = nodeDataDFs, .y = probsToTest, 
-                        .f = function(.x, .y){
-                          .x %>% mutate(intProb = .y)
-                        }) %>%
-  data.table::rbindlist() %>% as.data.frame()
-
-# Now we can finally plot
-# Degree
-nodeDataAllSims %>%
-  filter(Day == 1) %>% # we only need the first day's data because all days are the same
-  ggplot(aes(x = intProb, y = deg))+
-  geom_point(size = 0.6, alpha = 0.2)+
-  geom_smooth()+
-  theme_minimal()+
-  ylab("Degree")+ # high degree means the node is connected to many other nodes
-  xlab("Interaction probability")+
-  theme(text = element_text(size = 20))
-
-# Centrality
-nodeDataAllSims %>%
-  filter(Day == 1) %>% # we only need the first day's data because all days are the same
-  ggplot(aes(x = intProb, y = centr))+
-  geom_point(size = 0.6, alpha = 0.2)+
-  geom_smooth()+
-  theme_minimal()+
-  ylab("Eigenvector centrality")+ # high EC means the node is connected to many well-connected nodes
-  xlab("Interaction probability")+
-  theme(text = element_text(size = 20))
-
-# Network edge density
-densityList <- lapply(gsList, function(x){
-  lapply(x, edge_density) %>% 
-    unlist() %>% 
-    as.data.frame() %>%
-    setNames("density")
-})
-
-densities <- densityList %>% 
-  map2(., probsToTest, function(.x, .y){
-    .x %>%
-      mutate(intProb = .y)
-  }) %>%
-  data.table::rbindlist() %>%
-  as.data.frame()
-
-densities %>%
-  ggplot(aes(x = intProb, y = density))+
-  geom_point(size = 0.6, alpha = 0.2)+
-  geom_smooth()+
-  theme_minimal()+
-  ylab("Network Density")+ 
-  xlab("Interaction probability")+
-  theme(text = element_text(size = 20))
-
+# How does the average degree change over time?
+nd %>%
+  group_by(n, Day) %>%
+  summarize(mnDeg = mean(deg)) %>%
+  ggplot(aes(x = Day, y = mnDeg, col = n, group = n))+
+  geom_point()+
+  geom_line() # saturates
