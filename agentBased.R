@@ -38,9 +38,9 @@ runSim <- function(tmax = 10, n = 50, pNew = 0.1, pLose = 0.1, allowIsolated = T
   # Okay, this is our initial adjacency matrix.
   # Run the simulation for the number of days
   # idea: if an edge is lost, resulting in the degree of that node dropping to zero, then some high chance of creating a new edge for that node, selecting from any other nodes that its previous partner is connected to.
-  ams <- vector(mode = "list", length = tmax) # storage for edgelists for each day
+  ams <- vector(mode = "list", length = tmax) # storage for adjacency matrices for each day
   ams[[1]] <- amDay1
-  
+
   for(day in 2:tmax){
     cat(paste("day", day, "\n"))
     previousAM <- ams[[day-1]] # here's what we're working with
