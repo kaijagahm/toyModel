@@ -8,14 +8,8 @@ library(dils) # for filling in the edge list
 library(tidygraph)
 library(data.table)
 
-# Define parametesr
-tmax <- 10 # simulation time
-n <- 60 # number of nodes
-pint <- 0.4 # mean of the initial interaction probability distribution (base probability). How likely to interact.
-iter <- 1
-
-# Start interaction loop
-runSim <- function(tmax = 10, n = 50, pint = 0.4){
+# Function to run the model
+runSim <- function(tmax = 10, n = 50, pint = 0.4, pNew = 0.1, pLose = 0.1){
   
   # ***There are going to be three outputs: nodes, ams, gs. ***
   # Initialize nodes to zeros state (done once at the beginning of the simulation)
@@ -67,58 +61,55 @@ runSim <- function(tmax = 10, n = 50, pint = 0.4){
     activate(nodes) %>%
     mutate(name = 1:n) # name the nodes
   
-  # Okay, this is our initial graph. Now, want to set up a baseline level of edges disappearing and being created.
-  baseProbNewEdge <- 0.1
-  baseProbLoseEdge <- 0.2
-
-  completeEdgelist_day1 <- as_adjacency_matrix(g, type = "lower", names = TRUE) %>% 
-    as.matrix() %>% as.data.frame() %>%
-    mutate("from" = 1:nrow(.)) %>%
-    pivot_longer(cols = -from, 
-                 names_to = "to", 
-                 values_to = "weight") %>%
-    mutate(across(c("from", "to"), as.character))
-
+  # Get initial adjacency matrix
+  amDay1 <- get.adjacency(g) %>% as.matrix()
+  
+  # Okay, this is our initial adjacency matrix.
   # Run the simulation for the number of days
   # idea: if an edge is lost, resulting in the degree of that node dropping to zero, then some high chance of creating a new edge for that node, selecting from any other nodes that its previous partner is connected to.
-  els <- vector(mode = "list", length = tmax) # storage for edgelists for each day
-  els[[1]] <- completeEdgelist_day1
+  ams <- vector(mode = "list", length = tmax) # storage for edgelists for each day
+  ams[[1]] <- amDay1
   
   for(day in 2:tmax){
     cat(paste("day", day, "\n"))
-    previousEL <- els[[day-1]] # here's what we're working with
+    previousAM <- ams[[day-1]] # here's what we're working with
     
     # Create this day's edge list
-    newEL <- previousEL
-    newEL <- newEL %>%
-      mutate(switch = runif(nrow(.)),
-             weight = case_when(weight == 0 & switch < baseProbNewEdge ~ 1,
-                                weight == 0 & switch >= baseProbNewEdge ~ 0,
-                                weight == 1 & switch < baseProbLoseEdge ~ 0,
-                                weight == 1 & switch >= baseProbLoseEdge ~ 1)) %>%
-      select(-switch) %>% # remove switch; we no longer need it
-      filter(weight == 1)
+    newAM <- previousAM
     
-    # Save this day's edge list
-    els[[day]] <- newEL
+    switchfun <- function(x){
+      switch <- runif(1)
+      if(x == 0 & switch < pNew){
+        return(1)
+      }else if(x == 0 & switch >= pNew){
+        return(0)
+      }else if(x == 1 & switch < pLose){
+        return(0)
+      }else if(x == 1 & switch >= pLose){
+        return(1)
+      }
+    }
+    newAM <- apply(newAM, c(1,2), switchfun)
+    
+    # Save this day's adjacency matrix
+    ams[[day]] <- newAM
   } # close day
   
-  # Make each of the edge lists into a graph
-  gs <- lapply(els, function(x){
-    graph_from_data_frame(as.matrix(x[,c("from", "to")]), directed = FALSE, vertices = nodes)
+  # Make each of the edge lists into a graph, using only the upper triangle
+  gs <- lapply(ams, function(x){
+    graph_from_adjacency_matrix(x, mode = "upper", diag = FALSE)
   })
   
-  outputList <- list("gs" = gs, "interactions" = ints)
-  return(outputList)
+  return(gs)
 }
 
-sim <- runSim(tmax = 10, n = 60, pint = 0.4)
+sim <- runSim(tmax = 10, n = 20, pint = 0.4, pNew = 0.3, pLose = 0.5)
 
 # Create coordinates to use for plotting based on the optimal layout on the first day.
-layoutCoords <- layout_with_fr(sim$gs[[1]])
+layoutCoords <- layout_with_fr(sim[[1]])
 
 # Make a bunch of plots with the same layout
-lapply(sim$gs, function(x){
+lapply(sim, function(x){
   x %>% ggraph(layout = layoutCoords)+
     geom_edge_link(edge_width = 0.2)+
     geom_node_point(col = "steelblue", size = 5)+
