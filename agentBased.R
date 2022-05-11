@@ -25,79 +25,90 @@ runSim <- function(tmax = 10, n = 50, pint = 0.4){
                       timeFromLastInt = 0, # number of time steps since node's last encounter with another node
                       nInt = 0) # number of interactions this node had
   
-  # Initialize lists to store the graphs, interactions, and node-level data
+  # Initialize lists to store the graphs, interactions
   # 1. Graphs
   gs <- vector(mode = "list", length = tmax) # graphs
   
   # 2. Interactions
   ints <- vector(mode = "list", length = tmax) # interaction edge lists
   
-  # 3. Node-level data
-  nodeData <- vector(mode = "list", length = tmax) # node data
+  # Initialize the graph for the first day
+  # Randomize which nodes interact on this day
+  interactions <- matrix(nrow = 0, ncol = 2) # empty adjacency matrix to fill with interactions
+  # Interact each node with each other node
+  for(nodeA in 1:n){ 
+    for(nodeB in (nodeA+1):n){ # don't need to do the dyads twice; hence nodeA+1
+      # Ignore impossible values of nodeB
+      if(nodeB > n) next
+      if(nodeB == nodeA) next # no self edges!
+      # Calculate the probability of the two nodes meeting
+      probMeeting <- nodes[nodeA, "intProb"]*nodes[nodeB, "intProb"]
+      if(runif(1) < probMeeting){ # random draw between 0 and 1
+        # make an edge list
+        interactions <- rbind(interactions, c(nodeA, nodeB)) # the nodes and their weight
+      }
+    }
+  }
   
+  # We don't want to allow any isolated nodes. 
+  # If there's a node that isn't connected to anyone, add one random edge.
+  for(node in 1:n){
+    if(!(node %in% interactions[,1]) & !(node %in% interactions[,2])){
+      allNodes <- 1:n # all nodes
+      others <- allNodes[allNodes != node] # remove self from vector of possibilities
+      toAdd <- sample(others, 1) # pick one node to join the unconnected node to
+      interactions <- rbind(interactions, c(node, toAdd)) # add to edge list
+    }
+  }
+  
+  # Convert interactions to a graph
+  g <- graph_from_data_frame(interactions, vertices = nodes[,"nodeID"], directed = F) %>%
+    as_tbl_graph() %>%
+    activate(nodes) %>%
+    mutate(name = 1:n) # name the nodes
+  
+  # Okay, this is our initial graph. Now, want to set up a baseline level of edges disappearing and being created.
+  baseProbNewEdge <- 0.1
+  baseProbLoseEdge <- 0.2
+
+  completeEdgelist_day1 <- as_adjacency_matrix(g, type = "lower", names = TRUE) %>% 
+    as.matrix() %>% as.data.frame() %>%
+    mutate("from" = 1:nrow(.)) %>%
+    pivot_longer(cols = -from, 
+                 names_to = "to", 
+                 values_to = "weight") %>%
+    mutate(across(c("from", "to"), as.character))
+
   # Run the simulation for the number of days
-  for(day in 1:tmax){
+  # idea: if an edge is lost, resulting in the degree of that node dropping to zero, then some high chance of creating a new edge for that node, selecting from any other nodes that its previous partner is connected to.
+  els <- vector(mode = "list", length = tmax) # storage for edgelists for each day
+  els[[1]] <- completeEdgelist_day1
+  
+  for(day in 2:tmax){
     cat(paste("day", day, "\n"))
+    previousEL <- els[[day-1]] # here's what we're working with
     
-    # Randomize which nodes interact on this day
-    # empty adjacency matrix to fill with interactions
-    interactions <- matrix(nrow = 0, ncol = 2) 
+    # Create this day's edge list
+    newEL <- previousEL
+    newEL <- newEL %>%
+      mutate(switch = runif(nrow(.)),
+             weight = case_when(weight == 0 & switch < baseProbNewEdge ~ 1,
+                                weight == 0 & switch >= baseProbNewEdge ~ 0,
+                                weight == 1 & switch < baseProbLoseEdge ~ 0,
+                                weight == 1 & switch >= baseProbLoseEdge ~ 1)) %>%
+      select(-switch) %>% # remove switch; we no longer need it
+      filter(weight == 1)
     
-    # Interact each node with each other node
-    for(nodeA in 1:n){ 
-      for(nodeB in (nodeA+1):n){ # don't need to do the dyads twice; hence nodeA+1
-        # Ignore impossible values of nodeB
-        if(nodeB > n) next
-        if(nodeB == nodeA) next # no self edges!
-        # Calculate the probability of the two nodes meeting
-        probMeeting <- nodes[nodeA, "intProb"]*nodes[nodeB, "intProb"]
-        if(runif(1) < probMeeting){ # random draw between 0 and 1
-          # make an edge list
-          interactions <- rbind(interactions, c(nodeA, nodeB)) # the nodes and their weight
-        }
-      }
-    }
-    
-    # We don't want to allow any isolated nodes. If there's a node that isn't connected to anyone, add one random edge.
-    for(node in 1:n){
-      if(!(node %in% interactions[,1]) & !(node %in% interactions[,2])){
-        allNodes <- 1:n # all nodes
-        others <- allNodes[allNodes != node] # remove self from vector of possibilities
-        toAdd <- sample(others, 1) # pick one node to join the unconnected node to
-        interactions <- rbind(interactions, c(node, toAdd)) # add to edge list
-      }
-    }
-    
-    # Convert interactions to a full adjacency matrix, including any nodes that didn't interact
-    g <- graph_from_data_frame(interactions, vertices = nodes[,"nodeID"], directed = F) %>%
-      as_tbl_graph() %>%
-      activate(nodes) %>%
-      mutate(name = 1:n) # name the nodes
-    
-    # Calculate per-node stats for this day of interactions
-    interactingNodes <- as.data.frame(interactions) %>%
-      pivot_longer(cols = 1:2) %>%
-      pull() %>% as.integer() %>% sort() # get non-unique vector of all nodes that interacted
-    
-    for(r in 1:nrow(nodes)){
-      if(nodes[r, "nodeID"] %in% interactingNodes){
-        nodes[r, "nInt"] <- nodes[r, "nInt"] + sum(interactingNodes == r) # add number of interactions from today
-      }
-      if(nodes[r, "nodeID"] %in% interactingNodes){
-        nodes[r, "timeFromLastInt"] <- 0
-      }else{
-        nodes[r, "timeFromLastInt"] <- nodes[r, "timeFromLastInt"] + 1
-      }
-    }
-    
-    # Save to list
-    gs[[day]] <- g
-    ints[[day]] <- interactions
-    nodeData[[day]] <- nodes
-    
+    # Save this day's edge list
+    els[[day]] <- newEL
   } # close day
   
-  outputList <- list("gs" = gs, "interactions" = ints, "nodeData" = nodeData)
+  # Make each of the edge lists into a graph
+  gs <- lapply(els, function(x){
+    graph_from_data_frame(as.matrix(x[,c("from", "to")]), directed = FALSE, vertices = nodes)
+  })
+  
+  outputList <- list("gs" = gs, "interactions" = ints)
   return(outputList)
 }
 
