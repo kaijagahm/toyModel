@@ -8,61 +8,32 @@ library(dils) # for filling in the edge list
 library(tidygraph)
 library(data.table)
 
+connectIsolatedUpper <- function(mat){
+  for(r in 1:(nrow(mat)-1)){
+    for(c in 2:ncol(mat)){
+      if(all(mat[r, c:ncol(mat)] == 0)){
+        rand <- sample(c:ncol(mat), size = 1)
+        mat[r, rand] <- 1
+      }
+    }
+  }
+  return(mat)
+}
+
 # Function to run the model
-runSim <- function(tmax = 10, n = 50, pint = 0.4, pNew = 0.1, pLose = 0.1){
+runSim <- function(tmax = 10, n = 50, pNew = 0.1, pLose = 0.1, allowIsolated = TRUE){
   
-  # ***There are going to be three outputs: nodes, ams, gs. ***
-  # Initialize nodes to zeros state (done once at the beginning of the simulation)
-  # 1. NODES ***
-  nodes <- data.frame(nodeID = 1:n, # assign each node an ID
-                      intProb = pint, # interaction probability
-                      timeFromLastInt = 0, # number of time steps since node's last encounter with another node
-                      nInt = 0) # number of interactions this node had
+  # Initialize adjacency matrix
   
   # Initialize lists to store the graphs, interactions
   # 1. Graphs
   gs <- vector(mode = "list", length = tmax) # graphs
   
-  # 2. Interactions
-  ints <- vector(mode = "list", length = tmax) # interaction edge lists
-  
   # Initialize the graph for the first day
-  # Randomize which nodes interact on this day
-  interactions <- matrix(nrow = 0, ncol = 2) # empty adjacency matrix to fill with interactions
-  # Interact each node with each other node
-  for(nodeA in 1:n){ 
-    for(nodeB in (nodeA+1):n){ # don't need to do the dyads twice; hence nodeA+1
-      # Ignore impossible values of nodeB
-      if(nodeB > n) next
-      if(nodeB == nodeA) next # no self edges!
-      # Calculate the probability of the two nodes meeting
-      probMeeting <- nodes[nodeA, "intProb"]*nodes[nodeB, "intProb"]
-      if(runif(1) < probMeeting){ # random draw between 0 and 1
-        # make an edge list
-        interactions <- rbind(interactions, c(nodeA, nodeB)) # the nodes and their weight
-      }
-    }
+  amDay1 <- matrix(sample(0:1, n*n, replace = TRUE, prob = c(1-pNew, pNew)), n, n)
+  if(allowIsolated == FALSE){
+    amDay1 <- connectIsolatedUpper(amDay1)
   }
-  
-  # We don't want to allow any isolated nodes. 
-  # If there's a node that isn't connected to anyone, add one random edge.
-  for(node in 1:n){
-    if(!(node %in% interactions[,1]) & !(node %in% interactions[,2])){
-      allNodes <- 1:n # all nodes
-      others <- allNodes[allNodes != node] # remove self from vector of possibilities
-      toAdd <- sample(others, 1) # pick one node to join the unconnected node to
-      interactions <- rbind(interactions, c(node, toAdd)) # add to edge list
-    }
-  }
-  
-  # Convert interactions to a graph
-  g <- graph_from_data_frame(interactions, vertices = nodes[,"nodeID"], directed = F) %>%
-    as_tbl_graph() %>%
-    activate(nodes) %>%
-    mutate(name = 1:n) # name the nodes
-  
-  # Get initial adjacency matrix
-  amDay1 <- get.adjacency(g) %>% as.matrix()
   
   # Okay, this is our initial adjacency matrix.
   # Run the simulation for the number of days
@@ -91,6 +62,11 @@ runSim <- function(tmax = 10, n = 50, pint = 0.4, pNew = 0.1, pLose = 0.1){
     }
     newAM <- apply(newAM, c(1,2), switchfun)
     
+    if(allowIsolated == FALSE){
+      # Add a random edge for any isolated nodes, only paying attention to the upper triangle
+      newAM <- connectIsolatedUpper(newAM)
+    }
+    
     # Save this day's adjacency matrix
     ams[[day]] <- newAM
   } # close day
@@ -103,21 +79,20 @@ runSim <- function(tmax = 10, n = 50, pint = 0.4, pNew = 0.1, pLose = 0.1){
   return(gs)
 }
 
-sim60 <- runSim(tmax = 10, n = 60, pint = 0.4, pNew = 0.3, pLose = 0.5)
-sim50 <- runSim(tmax = 10, n = 50, pint = 0.4, pNew = 0.3, pLose = 0.5)
-sim40 <- runSim(tmax = 10, n = 40, pint = 0.4, pNew = 0.3, pLose = 0.5)
-sim30 <- runSim(tmax = 10, n = 30, pint = 0.4, pNew = 0.3, pLose = 0.5)
+sim60 <- runSim(tmax = 10, n = 60, pNew = 0.1, pLose = 0.9, allowIsolated = T)
+sim50 <- runSim(tmax = 10, n = 50, pNew = 0.1, pLose = 0.9, allowIsolated = T)
+sim40 <- runSim(tmax = 10, n = 40, pNew = 0.1, pLose = 0.9, allowIsolated = T)
+sim30 <- runSim(tmax = 10, n = 30, pNew = 0.1, pLose = 0.9, allowIsolated = T)
+sim10 <- runSim(tmax = 10, n = 10, pNew = 0.1, pLose = 0.9, allowIsolated = T)
 
 # Create coordinates to use for plotting based on the optimal layout on the first day.
-layoutCoords <- layout_with_fr(sim[[1]])
+layoutCoords <- layout_with_fr(sim10[[1]])
 
 # Make a bunch of plots with the same layout
-lapply(sim, function(x){
+lapply(sim10, function(x){
   x %>% ggraph(layout = layoutCoords)+
     geom_edge_link(edge_width = 0.2)+
-    geom_node_point(col = "steelblue", size = 5)+
-    geom_node_text(aes(label = name, vjust = 0.5), col = "black")
-})
+    geom_node_point(size = 5)})
 
 getNodeStats <- function(gs, type = "df"){
   # Check to make sure the "type" argument is valid
