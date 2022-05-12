@@ -25,10 +25,6 @@ init_graph <- graph_from_adjacency_matrix(am_init, weighted = NULL, mode = "undi
 # Name nodes
 V(init_graph)$name <- paste0("n", 1:n)
 
-#Get the coordinates of the Nodes
-coords <- layout_with_fr(init_graph) %>% 
-  bind_cols(tibble(names = names(V(init_graph))))
-
 # Loss and gain of edges --------------------------------------------------
 generateNetworks <- function(n, density, seed, remove, create, days){
   # Set the seed
