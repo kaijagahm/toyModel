@@ -23,6 +23,55 @@ connectIsolatedUpper <- function(mat){
   return(mat)
 }
 
+# Plot the output of a model simulation
+plotSim <- function(modelOutput, pointsize = 5, edgewidth = 0.2){
+  # Create coords for plotting based on the first day's network
+  coords <- layout_with_fr(modelOutput[[1]])
+  
+  lapply(modelOutput, function(x){
+    x %>%
+      ggraph(layout = coords)+
+      geom_edge_link(edge_width = edgewidth)+
+      geom_node_point(size = pointsize)
+  })
+}
+
+# Get node-level stats for the output of a simulation
+getNodeStats <- function(modelOutput, type = "df"){
+  # Check to make sure the "type" argument is valid
+  if(!(type %in% c("df", "graphs", "list"))){
+    stop("Argument 'type' must be 'df', 'graphs', or 'list'.")
+  }
+  
+  # Calculate stats
+  stats <- lapply(modelOutput, function(x){
+    x %>% 
+      as_tbl_graph() %>%
+      activate(nodes) %>%
+      mutate(centr = centrality_eigen(),
+             deg = degree(.))
+  })
+  
+  # Extract just the node data, making a list of data frames
+  statsDFList <- lapply(stats, function(x){
+    x %>% activate(nodes) %>% 
+      as.data.frame()
+  })
+  
+  # Compress the list of data frames into a single df
+  statsDF <- data.table::rbindlist(statsDFList, idcol = "Day") %>% 
+    as.data.frame()
+  
+  # Return different things based on what the user wants
+  if(type == "df"){
+    return(statsDF)
+  }else if(type == "list"){
+    return(statsDFList)
+  }else if(type == "graphs"){
+    return(stats)
+  }
+}
+
 # MODEL:
 # Returns a list of igraph network objects (graphs), one for each day in 1:tmax. 
 # Graphs are BINARY and UNDIRECTED, based on the UPPER TRIANGLE of the adjacency matrix. 
@@ -92,49 +141,7 @@ sim40 <- runSim(tmax = 10, n = 40, pNew = 0.1, pLose = 0.9, allowIsolated = T)
 sim30 <- runSim(tmax = 10, n = 30, pNew = 0.1, pLose = 0.9, allowIsolated = T)
 sim10 <- runSim(tmax = 10, n = 10, pNew = 0.1, pLose = 0.9, allowIsolated = T)
 
-# Create coordinates to use for plotting based on the optimal layout on the first day.
-layoutCoords <- layout_with_fr(sim10[[1]])
-
-# Make a bunch of plots with the same layout
-lapply(sim10, function(x){
-  x %>% ggraph(layout = layoutCoords)+
-    geom_edge_link(edge_width = 0.2)+
-    geom_node_point(size = 5)})
-
-getNodeStats <- function(gs, type = "df"){
-  # Check to make sure the "type" argument is valid
-  if(!(type %in% c("df", "graphs", "list"))){
-    stop("Argument 'type' must be 'df', 'graphs', or 'list'.")
-  }
-  
-  # Calculate stats
-  stats <- lapply(gs, function(x){
-    x %>% 
-      as_tbl_graph() %>%
-      activate(nodes) %>%
-      mutate(centr = centrality_eigen(),
-             deg = degree(.))
-  })
-  
-  # Extract just the node data, making a list of data frames
-  statsDFList <- lapply(stats, function(x){
-    x %>% activate(nodes) %>% 
-      as.data.frame()
-  })
-  
-  # Compress the list of data frames into a single df
-  statsDF <- data.table::rbindlist(statsDFList, idcol = "Day") %>% 
-    as.data.frame()
-  
-  # Return different things based on what the user wants
-  if(type == "df"){
-    return(statsDF)
-  }else if(type == "list"){
-    return(statsDFList)
-  }else if(type == "graphs"){
-    return(stats)
-  }
-}
+plotSim(sim10) # take a look at some of the plots
 
 # Run the simulation with various values of n
 nodeDataDF60 <- getNodeStats(sim60, type = "df") %>% mutate(n = 60)

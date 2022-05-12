@@ -35,16 +35,54 @@ connectIsolatedUpper <- function(mat){
 }
 
 # FOR USE IN ANALYZING THE RESULTS:
-```
+# Make a bunch of plots to show change in the network over the model run
+plotSim <- function(modelOutput, pointsize = 5, edgewidth = 0.2){
+  # Create coords for plotting based on the first day's network
+  coords <- layout_with_fr(modelOutput[[1]])
+  
+  lapply(modelOutput, function(x){
+    x %>%
+      ggraph(layout = coords)+
+      geom_edge_link(edge_width = edgewidth)+
+      geom_node_point(size = pointsize)
+  })
+}
 
-
-### Set some initial parameter values
-```{r}
-density <- 0.15 # initial density of the network (proportion of edges, out of all possible edges)
-seed <- 3 # for reproducible results
-remove <- 0.1 # probability of removing an edge, given that it exists
-create <- 0.05 # probability of creating an edge, given that it doesn't exist
-days <- 10 # how many days to run the simulation for.
+# Get node-level stats for the model simulation output
+getNodeStats <- function(modelOutput, type = "df"){
+  # Check to make sure the "type" argument is valid
+  if(!(type %in% c("df", "graphs", "list"))){
+    stop("Argument 'type' must be 'df', 'graphs', or 'list'.")
+  }
+  
+  # Calculate stats
+  stats <- lapply(modelOutput, function(x){
+    x %>% 
+      as_tbl_graph() %>%
+      activate(nodes) %>%
+      mutate(centr = centrality_eigen(),
+             deg = degree(.))
+  })
+  
+  # Extract just the node data, making a list of data frames
+  statsDFList <- lapply(stats, function(x){
+    x %>% activate(nodes) %>% 
+      as.data.frame()
+  })
+  
+  # Compress the list of data frames into a single df
+  statsDF <- data.table::rbindlist(statsDFList, idcol = "Day") %>% 
+    as.data.frame()
+  
+  # Return different things based on what the user wants
+  if(type == "df"){
+    return(statsDF)
+  }else if(type == "list"){
+    return(statsDFList)
+  }else if(type == "graphs"){
+    return(stats)
+  }
+}
 ```
 
 ### The main modeling function
@@ -65,7 +103,7 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   
   # SETUP
   # Initialize the adjacency matrix for the first day
-  amDay1 <- matrix(sample(0:1, n*n, replace = TRUE, prob = c(1-pNew, pNew)), n, n)
+  amDay1 <- matrix(sample(0:1, n*n, replace = TRUE, prob = c(1-pNew, pNew)), n, n) # using pNew here to determine the initial density of the network.
   if(allowIsolated == FALSE){
     amDay1 <- connectIsolatedUpper(amDay1)
   }
