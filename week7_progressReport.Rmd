@@ -1,0 +1,43 @@
+---
+title: "Week 7 Progress Report"
+author: "Kaija Gahm"
+date: "5/12/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load packages
+```{r include = FALSE}
+library(tidyverse)
+library(igraph)
+library(tidygraph)
+```
+
+### Set some initial parameter values
+```{r}
+n <- 30 # number of individuals
+density <- 0.15 # initial density of the network (proportion of edges, out of all possible edges)
+seed <- 3 # for reproducible results
+remove <- 0.1 # probability of removing an edge, given that it exists
+create <- 0.05 # probability of creating an edge, given that it doesn't exist
+days <- 10 # how many days to run the simulation for.
+```
+
+### Create an initial adjacency matrix
+```{r}
+# Initialize
+set.seed(seed)
+initialConnections <- sample(0:1, size = n*n, replace = T, prob = c(1-density, density))
+# Create the initial adjacency matrix
+am_init <- matrix(data = initialConnections, nrow = n, ncol = n)
+# Make the AM into a graph so we can operate on it
+init_graph <- graph_from_adjacency_matrix(am_init, weighted = NULL, mode = "undirected", diag = FALSE)
+# Name nodes
+V(init_graph)$name <- paste0("n", 1:n)
+```
+
+
+
