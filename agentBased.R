@@ -8,6 +8,9 @@ library(dils) # for filling in the edge list
 library(tidygraph)
 library(data.table)
 
+# XXX START HERE: next step is to include some sort of memory for which nodes were connected to which other ones in the previous time step, and have the rewiring incorporate that.
+# I'm just struggling to work with the different data structures for networks.
+
 connectIsolatedUpper <- function(mat){
   for(r in 1:(nrow(mat)-1)){
     for(c in 2:ncol(mat)){
@@ -20,48 +23,55 @@ connectIsolatedUpper <- function(mat){
   return(mat)
 }
 
-# Function to run the model
-runSim <- function(tmax = 10, n = 50, pNew = 0.1, pLose = 0.1, allowIsolated = TRUE){
+switchfun <- function(x){
+  switch <- runif(1)
+  if(x == 0 & switch < pNew){
+    return(1)
+  }else if(x == 0 & switch >= pNew){
+    return(0)
+  }else if(x == 1 & switch < pLose){
+    return(0)
+  }else if(x == 1 & switch >= pLose){
+    return(1)
+  }
+}
+
+
+# MODEL:
+# Returns a list of igraph network objects (graphs), one for each day in 1:tmax. 
+# Graphs are BINARY and UNDIRECTED, based on the UPPER TRIANGLE of the adjacency matrix. 
+runSim <- function(tmax = 10, # length of time over which to run the simulation
+                   n = 50, # number of individuals
+                   pNew = 0.1, # probability of gaining an edge given that it doesn't exist
+                   pLose = 0.1, # probability of losing an edge given that it exists
+                   allowIsolated = TRUE){ # allow nodes to be unconnected? If F, randomly connects each unconnected node with one other node.
   
-  # Initialize adjacency matrix
+  # STORAGE
+  # Initialize lists to store graphs and ajacency matrices for each time step
+  gs <- vector(mode = "list", length = tmax) # storage for graphs for each day--this will be the output.
+  ams <- vector(mode = "list", length = tmax) # storage for adjacency matrices for each day
   
-  # Initialize lists to store the graphs, interactions
-  # 1. Graphs
-  gs <- vector(mode = "list", length = tmax) # graphs
-  
-  # Initialize the graph for the first day
+  # SETUP
+  # Initialize the adjacency matrix for the first day
   amDay1 <- matrix(sample(0:1, n*n, replace = TRUE, prob = c(1-pNew, pNew)), n, n)
   if(allowIsolated == FALSE){
     amDay1 <- connectIsolatedUpper(amDay1)
   }
-  
-  # Okay, this is our initial adjacency matrix.
-  # Run the simulation for the number of days
-  # idea: if an edge is lost, resulting in the degree of that node dropping to zero, then some high chance of creating a new edge for that node, selecting from any other nodes that its previous partner is connected to.
-  ams <- vector(mode = "list", length = tmax) # storage for adjacency matrices for each day
   ams[[1]] <- amDay1
-
+  
+  # RUN SIMULATION
+  # Loop through the days
   for(day in 2:tmax){
-    cat(paste("day", day, "\n"))
-    previousAM <- ams[[day-1]] # here's what we're working with
+    cat(paste("day", day, "\n")) # minimal feedback while running the model, for sanity check on speed
+    previousAM <- ams[[day-1]] # previous day's matrix to operate on
     
-    # Create this day's edge list
+    # Create this day's adjacency matrix
     newAM <- previousAM
     
-    switchfun <- function(x){
-      switch <- runif(1)
-      if(x == 0 & switch < pNew){
-        return(1)
-      }else if(x == 0 & switch >= pNew){
-        return(0)
-      }else if(x == 1 & switch < pLose){
-        return(0)
-      }else if(x == 1 & switch >= pLose){
-        return(1)
-      }
-    }
+    # For each edge, determine whether it is created, destroyed, or left alone.
     newAM <- apply(newAM, c(1,2), switchfun)
     
+    # If we're not allowing isolated nodes, randomly connect each node one time.
     if(allowIsolated == FALSE){
       # Add a random edge for any isolated nodes, only paying attention to the upper triangle
       newAM <- connectIsolatedUpper(newAM)
@@ -71,14 +81,13 @@ runSim <- function(tmax = 10, n = 50, pNew = 0.1, pLose = 0.1, allowIsolated = T
     ams[[day]] <- newAM
   } # close day
   
-  # Make each of the edge lists into a graph, using only the upper triangle
+  # Make each of the adjacency matrices into a graph, using only the upper triangle
   gs <- lapply(ams, function(x){
     graph_from_adjacency_matrix(x, mode = "upper", diag = FALSE)
   })
   
   return(gs)
 }
-
 sim60 <- runSim(tmax = 10, n = 60, pNew = 0.1, pLose = 0.9, allowIsolated = T)
 sim50 <- runSim(tmax = 10, n = 50, pNew = 0.1, pLose = 0.9, allowIsolated = T)
 sim40 <- runSim(tmax = 10, n = 40, pNew = 0.1, pLose = 0.9, allowIsolated = T)
