@@ -23,20 +23,6 @@ connectIsolatedUpper <- function(mat){
   return(mat)
 }
 
-switchfun <- function(x){
-  switch <- runif(1)
-  if(x == 0 & switch < pNew){
-    return(1)
-  }else if(x == 0 & switch >= pNew){
-    return(0)
-  }else if(x == 1 & switch < pLose){
-    return(0)
-  }else if(x == 1 & switch >= pLose){
-    return(1)
-  }
-}
-
-
 # MODEL:
 # Returns a list of igraph network objects (graphs), one for each day in 1:tmax. 
 # Graphs are BINARY and UNDIRECTED, based on the UPPER TRIANGLE of the adjacency matrix. 
@@ -69,7 +55,18 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     newAM <- previousAM
     
     # For each edge, determine whether it is created, destroyed, or left alone.
-    newAM <- apply(newAM, c(1,2), switchfun)
+    newAM <- apply(newAM, c(1,2), function(x, new = pNew, lose = pLose){
+      switch <- runif(1)
+      if(x == 0 & switch < new){
+        return(1)
+      }else if(x == 0 & switch >= new){
+        return(0)
+      }else if(x == 1 & switch < lose){
+        return(0)
+      }else if(x == 1 & switch >= lose){
+        return(1)
+      }
+    })
     
     # If we're not allowing isolated nodes, randomly connect each node one time.
     if(allowIsolated == FALSE){
@@ -88,6 +85,7 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   
   return(gs)
 }
+
 sim60 <- runSim(tmax = 10, n = 60, pNew = 0.1, pLose = 0.9, allowIsolated = T)
 sim50 <- runSim(tmax = 10, n = 50, pNew = 0.1, pLose = 0.9, allowIsolated = T)
 sim40 <- runSim(tmax = 10, n = 40, pNew = 0.1, pLose = 0.9, allowIsolated = T)

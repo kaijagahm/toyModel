@@ -20,6 +20,7 @@ library(data.table)
 
 ### Define some utility functions for later use
 ```{r}
+# FOR USE IN THE MODEL:
 # Function that searches for any nodes that are not connected at all to other nodes, and fills in one random edge (but only paying attention to the upper quadrant of the adjacency matrix)
 connectIsolatedUpper <- function(mat){
   for(r in 1:(nrow(mat)-1)){
@@ -33,20 +34,7 @@ connectIsolatedUpper <- function(mat){
   return(mat)
 }
 
-# Function to create and delete edges based on given probabilities.
-# pNew is the probability of gaining an edge given that it doesn't exist. pLose is the probability of losing an existing edge.
-switchfun <- function(x){
-  switch <- runif(1)
-  if(x == 0 & switch < pNew){
-    return(1)
-  }else if(x == 0 & switch >= pNew){
-    return(0)
-  }else if(x == 1 & switch < pLose){
-    return(0)
-  }else if(x == 1 & switch >= pLose){
-    return(1)
-  }
-}
+# FOR USE IN ANALYZING THE RESULTS:
 ```
 
 
@@ -74,7 +62,7 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   # Initialize lists to store graphs and ajacency matrices for each time step
   gs <- vector(mode = "list", length = tmax) # storage for graphs for each day--this will be the output.
   ams <- vector(mode = "list", length = tmax) # storage for adjacency matrices for each day
-
+  
   # SETUP
   # Initialize the adjacency matrix for the first day
   amDay1 <- matrix(sample(0:1, n*n, replace = TRUE, prob = c(1-pNew, pNew)), n, n)
@@ -93,7 +81,18 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     newAM <- previousAM
     
     # For each edge, determine whether it is created, destroyed, or left alone.
-    newAM <- apply(newAM, c(1,2), switchfun)
+    newAM <- apply(newAM, c(1,2), function(x, new = pNew, lose = pLose){
+      switch <- runif(1)
+      if(x == 0 & switch < new){
+        return(1)
+      }else if(x == 0 & switch >= new){
+        return(0)
+      }else if(x == 1 & switch < lose){
+        return(0)
+      }else if(x == 1 & switch >= lose){
+        return(1)
+      }
+    })
     
     # If we're not allowing isolated nodes, randomly connect each node one time.
     if(allowIsolated == FALSE){
