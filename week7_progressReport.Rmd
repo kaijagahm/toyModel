@@ -21,17 +21,22 @@ library(data.table)
 ### Define some utility functions for later use
 ```{r}
 # FOR USE IN THE MODEL:
-# Function that searches for any nodes that are not connected at all to other nodes, and fills in one random edge (but only paying attention to the upper quadrant of the adjacency matrix)
-connectIsolatedUpper <- function(mat){
-  for(r in 1:(nrow(mat)-1)){
-    for(c in 2:ncol(mat)){
-      if(all(mat[r, c:ncol(mat)] == 0)){
-        rand <- sample(c:ncol(mat), size = 1)
-        mat[r, rand] <- 1
-      }
+# Function that searches for any nodes that are not connected at all to other nodes, and attaches them to one other node at random.
+connectIsolatedNodes <- function(g, allow){
+  if(any(degree(g) == 0) & allow == FALSE){
+    isolatedNodes <- which(degree(g) == 0)
+    gOut <- g
+    for(focalNode in isolatedNodes){
+      gOut <- add_edges(gOut, 
+                        edges = c(focalNode, #from the focal node...
+                                  #...to any other node
+                                  sample((1:n)[-focalNode], # (but not self!)
+                                         size = 1)))
     }
+    return(gOut)
+  }else{
+    return(g) # pass the graph through as it is, if there are no isolated nodes
   }
-  return(mat)
 }
 
 # Get only unique edges (since we're dealing with an undirected graph)
@@ -106,9 +111,7 @@ getNodeStats <- function(modelOutput, type = "df"){
 # Graphs are BINARY and UNDIRECTED, based on the UPPER TRIANGLE of the adjacency matrix. 
 runSim <- function(tmax = 10, # length of time over which to run the simulation
                    n = 50, # number of individuals
-                   pNew = 0.1, # probability of gaining an edge given that it doesn't exist
-                   pLose = 0.1, # probability of losing an edge given that it exists
-                   allowIsolated = TRUE, # allow nodes to be unconnected? If F, randomly connects each unconnected node with one other node.
+                   allowIsolated = FALSE, # allow nodes to be unconnected? If F, randomly connects each unconnected node with one other node.
                    baseAdd = 0.1, # p gain an edge given not connected in either of the previous two time steps
                    newLose = 0.3, # p lose an edge given connected in prev time step but not prev prev
                    lostAdd = 0.3, # p gain an edge given connected in prev prev time step but not prev
@@ -117,40 +120,40 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   # STORAGE
   # Initialize lists to store graphs and ajacency matrices for each time step
   gs <- vector(mode = "list", length = tmax) # storage for graphs for each day--this will be the output.
-  ams <- vector(mode = "list", length = tmax) # storage for adjacency matrices for each day
+  
+  # Make a list of all the unique node pairs
+  edges <- uniqueEdges(n)
   
   # SETUP
-  # Initialize the adjacency matrix for the first day
-  amDay1 <- matrix(sample(0:1, n*n, replace = TRUE, prob = c(1-pNew, pNew)), n, n) # using pNew here to determine the initial density of the network.
-  if(allowIsolated == FALSE){
-    amDay1 <- connectIsolatedUpper(amDay1)
-  }
-  cat("day 1\n")
-  ams[[1]] <- amDay1
+  # Initialize the adjacency matrix for the first day # XXX FIX LABEL
+  startingEdges <- edges %>%
+    sample_n(size = nrow(edges)*baseAdd)
+  # XXX FIX LABEL
+  day1G <- graph_from_data_frame(startingEdges, directed = FALSE, vertices = 1:n)
+  gs[[1]] <- day1G
+  
+  # Deal with isolated nodes
+  # The connectIsolatedNodes function has a built-in switch based on the allowIsolated parameter.
+  day1G <- connectIsolatedNodes(g = day1G, allow = allowIsolated)
   
   # RUN SIMULATION
   # Loop through the days
   for(day in 2:tmax){
     cat(paste("day", day, "\n")) # minimal feedback while running the model, for sanity check on speed
-    prev <- ams[[day-1]] # previous day's matrix to operate on
-    prevG <- graph_from_adjacency_matrix(prev, mode = "upper", diag = FALSE)
+    prevG <- gs[[day-1]] # previous day's matrix to operate on
     if(day < 3){
-      prevprev <- matrix(0, n, n) # if we don't have enough info to get the am from two days ago, make a zeroes matrix.
+      prevprevG <- graph_from_adjacency_matrix(matrix(0, n, n), mode = "upper", diag = FALSE) # if we don't have enough info to get the am from two days ago, make a zeroes graph
     }else{
-      prevprev <- ams[[day-2]]
+      prevprevG <- gs[[day-2]]
     }
-    prevprevG <- graph_from_adjacency_matrix(prevprev, mode = "upper", diag = FALSE)
     
-    # pseudocode
-    # 1. make a list of all the unique node pairs
-    edges <- uniqueEdges(n)
-    # 2. use get.edge.ids to search for the edge, using directed = FALSE
+    # Use get.edge.ids to search for the edge, using directed = FALSE
     edges <- edges %>%
       mutate(idInPrev = get.edge.ids(prevG, 
                                      vp = c(from, to), directed = F),
              idInPrevPrev = get.edge.ids(prevprevG, 
                                          vp = c(from, to), directed = F),
-             dice = runif(1:nrow(edges))) %>% # roll the dice for each individual edge
+             rand = runif(n = nrow(edges), min = 0, max = 1)) %>% # draw random number for each individual edge
       # characterize the type of relationship between each pair of nodes
       mutate(case = case_when(idInPrev == 0 & idInPrevPrev == 0 ~ "never",
                               idInPrev != 0 & idInPrevPrev == 0 ~ "new",
@@ -165,14 +168,14 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     
     # Rules (note that "stay" is comprehensible but not actionable, so I've translated it into ADD/LOSE)
     edges <- edges %>%
-      mutate(action = case_when(case == "never" & dice <= baseAdd ~ "add",
-                                case == "never" & dice > baseAdd ~ "none",
-                                case == "new" & dice <= newLose ~ "lose",
-                                case == "new" & dice > newLose ~ "none",
-                                case == "lost" & dice <= lostAdd ~ "add",
-                                case == "lost" & dice > lostAdd ~ "none",
-                                case == "always" & dice <= alwaysLose ~ "lose",
-                                case == "always" & dice > alwaysLose ~ "none",
+      mutate(action = case_when(case == "never" & rand <= baseAdd ~ "add",
+                                case == "never" & rand > baseAdd ~ "none",
+                                case == "new" & rand <= newLose ~ "lose",
+                                case == "new" & rand > newLose ~ "none",
+                                case == "lost" & rand <= lostAdd ~ "add",
+                                case == "lost" & rand > lostAdd ~ "none",
+                                case == "always" & rand <= alwaysLose ~ "lose",
+                                case == "always" & rand > alwaysLose ~ "none",
                                 TRUE ~ "error"))
     
     # Error message just in case!
@@ -193,28 +196,19 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
       }
     }
     
-    # START HERE: find a way to do the adding of nodes via igraph add_edges. Can then eliminate adjacency matrices entirely.
     # If we're not allowing isolated nodes, randomly connect each node one time.
-    if(allowIsolated == FALSE){
-      # Add a random edge for any isolated nodes, only paying attention to the upper triangle
-      newAM <- connectIsolatedUpper(newAM)
-    }
+    newG <- connectIsolatedNodes(g = newG, allow = allowIsolated)
     
-    # Save this day's adjacency matrix
-    ams[[day]] <- newAM
+    # Save this day's graph
+    gs[[day]] <- newG
   } # close day
-  
-  # Make each of the adjacency matrices into a graph, using only the upper triangle
-  gs <- lapply(ams, function(x){
-    graph_from_adjacency_matrix(x, mode = "upper", diag = FALSE)
-  })
   
   return(gs)
 }
 ```
 
 ```{r}
-test <- runSim(tmax = 10, n = 15)
+test <- runSim(tmax = 10, n = 15, allowIsolated = FALSE)
 ```
 
 
