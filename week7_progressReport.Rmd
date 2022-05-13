@@ -236,17 +236,31 @@ plotSim(test$g)
 ```
 ### Another test with a longer time frame: 50 days
 ```{r}
-test1000 <- runSim(tmax = 1000, n = 15, allowIsolated = FALSE, verbose = FALSE)
+test500 <- runSim(tmax = 500, n = 15, allowIsolated = FALSE, verbose = FALSE)
 ```
 
 ### Examine temporal dynamics
 ```{r}
-stats <- getNodeStats(test100$gs, type = "df")
+stats <- getNodeStats(test500$gs, type = "df")
 head(stats)
 stats %>%
-  ggplot(aes(x = Day, y = deg))+
-  geom_point(alpha = 0.1)+
-  geom_smooth()+
+  ggplot(aes(x = Day, y = jitter(deg)))+
+  geom_point(alpha = 0.05)+
+  geom_smooth(size = 2)+
   theme_minimal()
+# Interesting, the oscillations seem to dampen as time goes on. That makes sense. I think I've created solid baseline dynamics!
+```
+
+### Allow isolated nodes--does behavior change?
+```{r}
+test500 <- runSim(tmax = 500, n = 15, allowIsolated = TRUE, verbose = FALSE)
+stats <- getNodeStats(test500$gs, type = "df")
+head(stats)
+stats %>%
+  ggplot(aes(x = Day, y = jitter(deg)))+
+  geom_point(alpha = 0.05)+
+  geom_smooth(size = 2)+
+  theme_minimal()
+# Approximately the same dynamics. Maybe slightly more fluctuations, but maybe not.
 ```
 
