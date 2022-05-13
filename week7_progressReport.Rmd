@@ -146,29 +146,43 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
                                      vp = c(from, to), directed = F),
              idInPrevPrev = get.edge.ids(prevprevG, 
                                          vp = c(from, to), directed = F),
-             dice = runif(1:nrow(edges))) %>%
+             dice = runif(1:nrow(edges))) %>% # roll the dice for each individual edge
       mutate(case = case_when(idInPrev == 0 & idInPrevPrev == 0 ~ "never",
-                              idInPrev == 1 & idInPrevPrev == 0 ~ "recent",
-                              idInPrev == 0 & idInPrevPrev == 1 ~ "lost",
-                              idInPrev == 1 & idInPrevPrev == 1 ~ "always"))
+                              idInPrev != 0 & idInPrevPrev == 0 ~ "new",
+                              idInPrev == 0 & idInPrevPrev != 0 ~ "lost",
+                              idInPrev != 0 & idInPrevPrev != 0 ~ "always",
+                              TRUE ~ "error"))
     
-    # 5. Four cases: found/found, found/not, not/not, and not/found. For each case, roll the dice. Use add_edges. Seems that when I add an edge to an undirected graph, it creates an undirected edge, which is good. delete_edges to remove edges.
+    # Rules (note that "stay" is comprehensible but not actionable, so I've translated it into ADD/LOSE)
+    baseAdd <- 0.1 # p of gaining an edge given not connected in either of the previous two time steps
+    newLose <- 0.3 # p of losing an edge given connected in prev time step but not prev prev
+    lostAdd <- 0.3 # p of gaining an edge given connected in prev prev time step but not prev
+    alwaysLose <- 0.1 # p of losing edge given connected in previous 2 time steps
+    edges <- edges %>%
+      mutate(action = case_when(case == "never" & dice <= baseAdd ~ "add",
+                                case == "never" & dice > baseAdd ~ "nothing",
+                                case == "new" & dice <= newLose ~ "lose",
+                                case == "new" & dice > newLose ~ "nothing",
+                                case == "lost" & dice <= lostAdd ~ "add",
+                                case == "lost" & dice > lostAdd ~ "nothing",
+                                case == "always" & dice <= alwaysLose ~ "lose",
+                                case == "always" & dice > alwaysLose ~ "nothing",
+                                TRUE ~ "error"))
     
-    # For each edge, determine whether it is created, destroyed, or left alone.
-    edges <- 
-      newAM <- apply(prev, c(1,2), function(x, new = pNew, lose = pLose){
-        switch <- runif(1)
-        if(x == 0 & switch < new){
-          return(1)
-        }else if(x == 0 & switch >= new){
-          return(0)
-        }else if(x == 1 & switch < lose){
-          return(0)
-        }else if(x == 1 & switch >= lose){
-          return(1)
-        }
-      })
+    # Loop through the edges and operate on them
+    newG <- prevG # initialize new graph
+    for(edge in 1:nrow(edges)){
+      pair <- c(edges[edge, "from"], edges[edge, "to"])
+      if(edges[edge, "action"] == "add"){
+        newG <- add_edges(graph = newG, edges = pair)
+      }else if(edges[edge, "action"] == "lose"){
+        newG <- delete_edges(graph = newG, edges = pair)
+      }else{
+        newG <- newG
+      }
+    }
     
+    # START HERE: find a way to do the adding of nodes via igraph add_edges. Can then eliminate adjacency matrices entirely.
     # If we're not allowing isolated nodes, randomly connect each node one time.
     if(allowIsolated == FALSE){
       # Add a random edge for any isolated nodes, only paying attention to the upper triangle
