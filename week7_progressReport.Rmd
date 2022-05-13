@@ -127,6 +127,7 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   
   # SETUP
   # Create the graph for the first day
+  set.seed(3)
   startingEdges <- edges %>%
     sample_n(size = nrow(edges)*baseAdd) # sample some edges based on the probability of creating edges out of nowhere
   day1G <- graph_from_data_frame(startingEdges, directed = FALSE, vertices = 1:n)
@@ -148,12 +149,20 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     }
     
     # Use get.edge.ids to search for the edge, using directed = FALSE
-    edgesInfo <- edges %>%
-      mutate(idInPrevPrev = get.edge.ids(prevprevG, 
-                                         vp = c(from, to), directed = F),
-             idInPrev = get.edge.ids(prevG, 
-                                     vp = c(from, to), directed = F),
-             rand = runif(n = nrow(edges), min = 0, max = 1)) %>% # draw random number for each individual edge
+    # Annoyingly, have to use a for loop with get.edge.ids--returns mysterious weird results if I try to use it with mutate. Not sure why. I wonder if there's a vectorized alternative in tidygraph. Need to investigate this further.
+    edgesInfo <- edges
+    edgesInfo$idInPrevPrev <- NA
+    edgesInfo$idInPrev <- NA
+    for(edge in 1:nrow(edges)){
+      from <- edges[edge, "from"]
+      to <- edges[edge, "to"]
+      edgesInfo$idInPrevPrev[edge] <- get.edge.ids(prevprevG, 
+                                         vp = c(from, to), directed = F)
+      edgesInfo$idInPrev[edge] <- get.edge.ids(prevG, 
+                                     vp = c(from, to), directed = F)
+    }
+    edgesInfo <- edgesInfo %>% mutate(rand = runif(n = nrow(edges), 
+                                                   min = 0, max = 1)) %>% # draw random number for each individual edge
       # characterize the type of relationship between each pair of nodes
       mutate(case = case_when(idInPrev == 0 & idInPrevPrev == 0 ~ "never",
                               idInPrev != 0 & idInPrevPrev == 0 ~ "new",
@@ -190,10 +199,12 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
       if(edgesInfo[edge, "action"] == "add"){
         newG <- add_edges(graph = newG, edges = pair)
       }else if(edgesInfo[edge, "action"] == "lose"){
-        newG <- delete_edges(graph = newG, edges = pair)
+        edgeID <- get.edge.ids(newG, vp = pair, directed = F)
+        newG <- delete_edges(graph = newG, edgeID) # XXX UNBELIEVABLE--WHY DOES DELETE_EDGES WORK DIFFERENTLY THAN ADD_EDGES??????
       }else{
         newG <- newG
       }
+      # print(paste0("iteration ", edge, " complete")) # for debug
     }
     
     # If we're not allowing isolated nodes, randomly connect each node one time.
@@ -210,6 +221,7 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
 ```
 
 ```{r}
+set.seed(5)
 test <- runSim(tmax = 10, n = 15, allowIsolated = FALSE)
 ```
 
