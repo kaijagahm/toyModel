@@ -158,17 +158,27 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
                               idInPrev != 0 & idInPrevPrev != 0 ~ "always",
                               TRUE ~ "error"))
     
+    # Error message just in case!
+    if(any(edges$case == "error")){
+      stop("error computing edge cases!")
+    }
+    
     # Rules (note that "stay" is comprehensible but not actionable, so I've translated it into ADD/LOSE)
     edges <- edges %>%
       mutate(action = case_when(case == "never" & dice <= baseAdd ~ "add",
-                                case == "never" & dice > baseAdd ~ "nothing",
+                                case == "never" & dice > baseAdd ~ "none",
                                 case == "new" & dice <= newLose ~ "lose",
-                                case == "new" & dice > newLose ~ "nothing",
+                                case == "new" & dice > newLose ~ "none",
                                 case == "lost" & dice <= lostAdd ~ "add",
-                                case == "lost" & dice > lostAdd ~ "nothing",
+                                case == "lost" & dice > lostAdd ~ "none",
                                 case == "always" & dice <= alwaysLose ~ "lose",
-                                case == "always" & dice > alwaysLose ~ "nothing",
+                                case == "always" & dice > alwaysLose ~ "none",
                                 TRUE ~ "error"))
+    
+    # Error message just in case!
+    if(any(edges$action == "error")){
+      stop("error computing edge actions!")
+    }
     
     # Loop through the edges and operate on them
     newG <- prevG # initialize new graph
