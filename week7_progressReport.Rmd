@@ -127,7 +127,6 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   
   # SETUP
   # Create the graph for the first day
-  set.seed(3)
   startingEdges <- edges %>%
     sample_n(size = nrow(edges)*baseAdd) # sample some edges based on the probability of creating edges out of nowhere
   day1G <- graph_from_data_frame(startingEdges, directed = FALSE, vertices = 1:n)
@@ -193,13 +192,14 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     }
     
     # Loop through the edges and operate on them
+    # Idea for later: df[,c("from", "to")] %>% as.matrix() %>% t() %>% as.vector() to be fed into add_edges so I can do them all at once (assuming that df is edgesInfo %>% filter(action == "add)). But no point in refactoring the code to do this right now since it turns out it doesn't work for delete_edges.
     newG <- prevG # initialize new graph
     for(edge in 1:nrow(edgesInfo)){
       pair <- c(edgesInfo[edge, "from"], edgesInfo[edge, "to"])
       if(edgesInfo[edge, "action"] == "add"){
         newG <- add_edges(graph = newG, edges = pair)
       }else if(edgesInfo[edge, "action"] == "lose"){
-        edgeID <- get.edge.ids(newG, vp = pair, directed = F)
+        edgeID <- get.edge.ids(newG, vp = pair, directed = F) # XXXXXXXXXXXX
         newG <- delete_edges(graph = newG, edgeID) # XXX UNBELIEVABLE--WHY DOES DELETE_EDGES WORK DIFFERENTLY THAN ADD_EDGES??????
       }else{
         newG <- newG
@@ -221,7 +221,6 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
 ```
 
 ```{r}
-set.seed(5)
 test <- runSim(tmax = 10, n = 15, allowIsolated = FALSE)
 ```
 
