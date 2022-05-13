@@ -120,6 +120,7 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   # STORAGE
   # Initialize lists to store graphs and ajacency matrices for each time step
   gs <- vector(mode = "list", length = tmax) # storage for graphs for each day--this will be the output.
+  ei <- vector(mode = "list", length = tmax) # store edge info for each day
   
   # Make a list of all the unique node pairs
   edges <- uniqueEdges(n)
@@ -129,11 +130,11 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   startingEdges <- edges %>%
     sample_n(size = nrow(edges)*baseAdd) # sample some edges based on the probability of creating edges out of nowhere
   day1G <- graph_from_data_frame(startingEdges, directed = FALSE, vertices = 1:n)
-  gs[[1]] <- day1G
   
   # Deal with isolated nodes
   # The connectIsolatedNodes function has a built-in switch based on the allowIsolated parameter.
   day1G <- connectIsolatedNodes(g = day1G, allow = allowIsolated)
+  gs[[1]] <- day1G
   
   # RUN SIMULATION
   # Loop through the days
@@ -147,11 +148,11 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     }
     
     # Use get.edge.ids to search for the edge, using directed = FALSE
-    edges <- edges %>%
-      mutate(idInPrev = get.edge.ids(prevG, 
-                                     vp = c(from, to), directed = F),
-             idInPrevPrev = get.edge.ids(prevprevG, 
+    edgesInfo <- edges %>%
+      mutate(idInPrevPrev = get.edge.ids(prevprevG, 
                                          vp = c(from, to), directed = F),
+             idInPrev = get.edge.ids(prevG, 
+                                     vp = c(from, to), directed = F),
              rand = runif(n = nrow(edges), min = 0, max = 1)) %>% # draw random number for each individual edge
       # characterize the type of relationship between each pair of nodes
       mutate(case = case_when(idInPrev == 0 & idInPrevPrev == 0 ~ "never",
@@ -161,12 +162,12 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
                               TRUE ~ "error"))
     
     # Error message just in case!
-    if(any(edges$case == "error")){
+    if(any(edgesInfo$case == "error")){
       stop("error computing edge cases!")
     }
     
     # Rules (note that "stay" is comprehensible but not actionable, so I've translated it into ADD/LOSE)
-    edges <- edges %>%
+    edgesInfo <- edgesInfo %>%
       mutate(action = case_when(case == "never" & rand <= baseAdd ~ "add",
                                 case == "never" & rand > baseAdd ~ "none",
                                 case == "new" & rand <= newLose ~ "lose",
@@ -178,17 +179,17 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
                                 TRUE ~ "error"))
     
     # Error message just in case!
-    if(any(edges$action == "error")){
+    if(any(edgesInfo$action == "error")){
       stop("error computing edge actions!")
     }
     
     # Loop through the edges and operate on them
     newG <- prevG # initialize new graph
-    for(edge in 1:nrow(edges)){
-      pair <- c(edges[edge, "from"], edges[edge, "to"])
-      if(edges[edge, "action"] == "add"){
+    for(edge in 1:nrow(edgesInfo)){
+      pair <- c(edgesInfo[edge, "from"], edgesInfo[edge, "to"])
+      if(edgesInfo[edge, "action"] == "add"){
         newG <- add_edges(graph = newG, edges = pair)
-      }else if(edges[edge, "action"] == "lose"){
+      }else if(edgesInfo[edge, "action"] == "lose"){
         newG <- delete_edges(graph = newG, edges = pair)
       }else{
         newG <- newG
@@ -200,6 +201,8 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     
     # Save this day's graph
     gs[[day]] <- newG
+    # Save this day's edge info
+    ei[[day]] <- edgesInfo
   } # close day
   
   return(gs)
