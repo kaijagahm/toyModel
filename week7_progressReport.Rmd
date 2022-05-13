@@ -59,12 +59,12 @@ plotSim <- function(modelOutput, pointsize = 5, edgewidth = 0.2){
   # Create coords for plotting based on the first day's network
   coords <- layout_with_fr(modelOutput[[1]])
   
-  lapply(modelOutput, function(x){
+  return(lapply(modelOutput, function(x){
     x %>%
       ggraph(layout = coords)+
       geom_edge_link(edge_width = edgewidth)+
       geom_node_point(size = pointsize)
-  })
+  }))
 }
 
 # Get node-level stats for the model simulation output
@@ -115,8 +115,8 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
                    baseAdd = 0.1, # p gain an edge given not connected in either of the previous two time steps
                    newLose = 0.3, # p lose an edge given connected in prev time step but not prev prev
                    lostAdd = 0.3, # p gain an edge given connected in prev prev time step but not prev
-                   alwaysLose = 0.1){ # p lose edge given connected in previous 2 time steps)
-  
+                   alwaysLose = 0.1,
+                   verbose = TRUE){ # p lose edge given connected in previous 2 time steps)
   # STORAGE
   # Initialize lists to store graphs and ajacency matrices for each time step
   gs <- vector(mode = "list", length = tmax) # storage for graphs for each day--this will be the output.
@@ -138,8 +138,13 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   
   # RUN SIMULATION
   # Loop through the days
+  progress <- 0 # initialize progress indicator
+  cat("0%\n")
   for(day in 2:tmax){
-    cat(paste("day", day, "\n")) # minimal feedback while running the model, for sanity check on speed
+    if(verbose){
+          cat(paste("day", day, "\n")) # minimal feedback while running the model, for sanity check on speed
+    }
+    
     prevG <- gs[[day-1]] # previous day's matrix to operate on
     if(day < 3){
       prevprevG <- graph_from_adjacency_matrix(matrix(0, n, n), mode = "upper", diag = FALSE) # if we don't have enough info to get the am from two days ago, make a zeroes graph
@@ -214,14 +219,34 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     gs[[day]] <- newG
     # Save this day's edge info
     ei[[day]] <- edgesInfo
+    if((day/tmax) >= progress + 0.1){
+      progress <- day/tmax
+      cat(paste0(progress*100, "%\n"))
+    }
   } # close day
   
-  return(gs)
+  return(list("gs" = gs, "ei" = ei))
 }
 ```
 
+### Test-run the simulation and plot the results
 ```{r}
-test <- runSim(tmax = 10, n = 15, allowIsolated = FALSE)
+test <- runSim(tmax = 10, n = 15, allowIsolated = FALSE, verbose = FALSE)
+plotSim(test$g)
+```
+### Another test with a longer time frame: 50 days
+```{r}
+test1000 <- runSim(tmax = 1000, n = 15, allowIsolated = FALSE, verbose = FALSE)
 ```
 
+### Examine temporal dynamics
+```{r}
+stats <- getNodeStats(test100$gs, type = "df")
+head(stats)
+stats %>%
+  ggplot(aes(x = Day, y = deg))+
+  geom_point(alpha = 0.1)+
+  geom_smooth()+
+  theme_minimal()
+```
 
