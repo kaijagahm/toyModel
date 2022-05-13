@@ -125,10 +125,9 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   edges <- uniqueEdges(n)
   
   # SETUP
-  # Initialize the adjacency matrix for the first day # XXX FIX LABEL
+  # Create the graph for the first day
   startingEdges <- edges %>%
-    sample_n(size = nrow(edges)*baseAdd)
-  # XXX FIX LABEL
+    sample_n(size = nrow(edges)*baseAdd) # sample some edges based on the probability of creating edges out of nowhere
   day1G <- graph_from_data_frame(startingEdges, directed = FALSE, vertices = 1:n)
   gs[[1]] <- day1G
   
