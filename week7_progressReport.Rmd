@@ -108,7 +108,11 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
                    n = 50, # number of individuals
                    pNew = 0.1, # probability of gaining an edge given that it doesn't exist
                    pLose = 0.1, # probability of losing an edge given that it exists
-                   allowIsolated = TRUE){ # allow nodes to be unconnected? If F, randomly connects each unconnected node with one other node.
+                   allowIsolated = TRUE, # allow nodes to be unconnected? If F, randomly connects each unconnected node with one other node.
+                   baseAdd = 0.1, # p gain an edge given not connected in either of the previous two time steps
+                   newLose = 0.3, # p lose an edge given connected in prev time step but not prev prev
+                   lostAdd = 0.3, # p gain an edge given connected in prev prev time step but not prev
+                   alwaysLose = 0.1){ # p lose edge given connected in previous 2 time steps)
   
   # STORAGE
   # Initialize lists to store graphs and ajacency matrices for each time step
@@ -147,6 +151,7 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
              idInPrevPrev = get.edge.ids(prevprevG, 
                                          vp = c(from, to), directed = F),
              dice = runif(1:nrow(edges))) %>% # roll the dice for each individual edge
+      # characterize the type of relationship between each pair of nodes
       mutate(case = case_when(idInPrev == 0 & idInPrevPrev == 0 ~ "never",
                               idInPrev != 0 & idInPrevPrev == 0 ~ "new",
                               idInPrev == 0 & idInPrevPrev != 0 ~ "lost",
@@ -154,10 +159,6 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
                               TRUE ~ "error"))
     
     # Rules (note that "stay" is comprehensible but not actionable, so I've translated it into ADD/LOSE)
-    baseAdd <- 0.1 # p of gaining an edge given not connected in either of the previous two time steps
-    newLose <- 0.3 # p of losing an edge given connected in prev time step but not prev prev
-    lostAdd <- 0.3 # p of gaining an edge given connected in prev prev time step but not prev
-    alwaysLose <- 0.1 # p of losing edge given connected in previous 2 time steps
     edges <- edges %>%
       mutate(action = case_when(case == "never" & dice <= baseAdd ~ "add",
                                 case == "never" & dice > baseAdd ~ "nothing",
