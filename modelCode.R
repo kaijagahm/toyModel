@@ -101,15 +101,15 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
                    allowIsolated = FALSE, 
                    # p gain an edge given not connected in either of the 
                    # previous two time steps
-                   baseAdd = 0.1, 
+                   add00 = 0.1, 
                    # p lose an edge given connected in prev time step but 
                    # not prev prev
-                   newLose = 0.3, 
+                   lose01 = 0.3, 
                    # p gain an edge given connected in prev prev time step 
                    # but not prev
-                   lostAdd = 0.3, 
+                   add10 = 0.3, 
                    # p lose edge given connected in previous 2 time steps
-                   alwaysLose = 0.1,
+                   lose11 = 0.1,
                    verbose = TRUE){ 
   # STORAGE
   # Initialize lists to store graphs and ajacency matrices for each time step
@@ -125,7 +125,7 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
   # Create the graph for the first day
   startingEdges <- edges %>%
     # sample some edges based on the prob of creating edges out of nowhere
-    sample_n(size = nrow(edges)*baseAdd) 
+    sample_n(size = nrow(edges)*add00) 
   day1G <- graph_from_data_frame(startingEdges, directed = FALSE, vertices = 1:n)
   
   # Deal with isolated nodes
@@ -174,10 +174,10 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     edgesInfo <- edgesInfo %>% mutate(rand = runif(n = nrow(edges), 
                                                    min = 0, max = 1)) %>% 
       # Characterize the type of relationship between each pair of nodes
-      mutate(case = case_when(idInPrev == 0 & idInPrevPrev == 0 ~ "never",
-                              idInPrev != 0 & idInPrevPrev == 0 ~ "new",
-                              idInPrev == 0 & idInPrevPrev != 0 ~ "lost",
-                              idInPrev != 0 & idInPrevPrev != 0 ~ "always",
+      mutate(case = case_when(idInPrev == 0 & idInPrevPrev == 0 ~ "h00",
+                              idInPrev != 0 & idInPrevPrev == 0 ~ "h01",
+                              idInPrev == 0 & idInPrevPrev != 0 ~ "h10",
+                              idInPrev != 0 & idInPrevPrev != 0 ~ "h11",
                               TRUE ~ "error"))
     
     # Error message just in case!
@@ -188,14 +188,14 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     # Rules (note that "stay" is comprehensible but not actionable, 
     # so I've translated it into ADD/LOSE)
     edgesInfo <- edgesInfo %>%
-      mutate(action = case_when(case == "never" & rand <= baseAdd ~ "add",
-                                case == "never" & rand > baseAdd ~ "none",
-                                case == "new" & rand <= newLose ~ "lose",
-                                case == "new" & rand > newLose ~ "none",
-                                case == "lost" & rand <= lostAdd ~ "add",
-                                case == "lost" & rand > lostAdd ~ "none",
-                                case == "always" & rand <= alwaysLose ~ "lose",
-                                case == "always" & rand > alwaysLose ~ "none",
+      mutate(action = case_when(case == "h00" & rand <= add00 ~ "add",
+                                case == "h00" & rand > add00 ~ "none",
+                                case == "h01" & rand <= lose01 ~ "lose",
+                                case == "h01" & rand > lose01 ~ "none",
+                                case == "h10" & rand <= add10 ~ "add",
+                                case == "h10" & rand > add10 ~ "none",
+                                case == "h11" & rand <= lose11 ~ "lose",
+                                case == "h11" & rand > lose11 ~ "none",
                                 TRUE ~ "error"))
     
     # Error message just in case!
@@ -209,7 +209,7 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     # (assuming that df is edgesInfo %>% filter(action == "add)). But no 
     # point in refactoring the code to do this right now since it turns 
     # out it doesn't work for delete_edges.
-    newG <- prevG # initialize new graph
+    newG <- prevG # initialize h01 graph
     for(edge in 1:nrow(edgesInfo)){
       pair <- c(edgesInfo[edge, "from"], edgesInfo[edge, "to"])
       if(edgesInfo[edge, "action"] == "add"){
