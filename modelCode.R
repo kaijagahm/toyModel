@@ -3,6 +3,7 @@ library(igraph)
 library(ggraph)
 library(tidygraph)
 library(data.table)
+library(checkmate)
 
 ### Define utility functions for later use
 # FOR USE IN THE MODEL:
@@ -112,6 +113,13 @@ runSim <- function(tmax = 50, # length of time over which to run the simulation
                    # p lose edge given connected in previous 2 time steps
                    lose11 = 0.1,
                    verbose = TRUE){ 
+  ## Check input arguments
+  # XXX START HERE with checkmate package.
+  
+  # Make sure tmax is long enough.
+  if(tmax < 3){
+    stop("tmax must be 3 or greater.")
+  }
   
   # Set the setup time automatically if unspecified
   if(is.null(t_setup)){
@@ -119,10 +127,10 @@ runSim <- function(tmax = 50, # length of time over which to run the simulation
   }
   
   # Set a variable for the iteration number on which the perturbation will occur
-  if(t_setup <= tmax-1 & t_setup > 1){
+  if(t_setup <= tmax-1 & t_setup > 3){
     iter_perturb <- t_setup + 1
   }else{
-    stop("Setup time must be between 1 and tmax-1.")
+    stop("Setup time must be between 3 and tmax-1.")
   }
 
   # STORAGE
@@ -157,6 +165,8 @@ runSim <- function(tmax = 50, # length of time over which to run the simulation
       # minimal feedback while running the model, for sanity check on speed
       cat(paste("day", day, "\n")) 
     }
+    
+    # Skeleton logic for doing the perturbation
     
     prevG <- gs[[day-1]] # previous day's matrix to operate on
     if(day < 3){
