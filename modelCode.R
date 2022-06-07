@@ -118,6 +118,13 @@ runSim <- function(tmax = 50, # length of time over which to run the simulation
     t_setup <- tmax/10
   }
   
+  # Set a variable for the iteration number on which the perturbation will occur
+  if(t_setup <= tmax-1 & t_setup > 1){
+    iter_perturb <- t_setup + 1
+  }else{
+    stop("Setup time must be between 1 and tmax-1.")
+  }
+
   # STORAGE
   # Initialize lists to store graphs and ajacency matrices for each time step
   # storage for graphs for each day
