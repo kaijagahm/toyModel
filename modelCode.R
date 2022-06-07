@@ -94,7 +94,8 @@ getNodeStats <- function(modelOutput, type = "df"){
 # MODEL:
 # Returns a list of igraph network objects (graphs), one for each day in 1:tmax. 
 # Graphs are BINARY and UNDIRECTED, based on the UPPER TRIANGLE of the adjacency matrix. 
-runSim <- function(tmax = 10, # length of time over which to run the simulation
+runSim <- function(tmax = 50, # length of time over which to run the simulation
+                   t_setup = NULL,
                    n = 50, # number of individuals
                    # allow nodes to be unconnected? If F, randomly connects 
                    # each unconnected node with one other node.
@@ -111,6 +112,12 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
                    # p lose edge given connected in previous 2 time steps
                    lose11 = 0.1,
                    verbose = TRUE){ 
+  
+  # Set the setup time automatically if unspecified
+  if(is.null(t_setup)){
+    t_setup <- tmax/10
+  }
+  
   # STORAGE
   # Initialize lists to store graphs and ajacency matrices for each time step
   # storage for graphs for each day
@@ -173,8 +180,8 @@ runSim <- function(tmax = 10, # length of time over which to run the simulation
     # draw random number for each individual edge
     edgesInfo <- edgesInfo %>% mutate(rand = runif(n = nrow(edges), 
                                                    min = 0, max = 1)) %>% 
-      # Characterize the type of relationship between each pair of nodes
-      mutate(case = case_when(idInPrev == 0 & idInPrevPrev == 0 ~ "h00",
+      # Characterize the type of edge according to its history (h)
+      mutate(case = case_when(idInPrev == 0 & idInPrevPrev == 0 ~ "h00", 
                               idInPrev != 0 & idInPrevPrev == 0 ~ "h01",
                               idInPrev == 0 & idInPrevPrev != 0 ~ "h10",
                               idInPrev != 0 & idInPrevPrev != 0 ~ "h11",
