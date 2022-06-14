@@ -83,6 +83,47 @@ remove.network.node <- function(network, n.removed = 1, id = NULL) {
   return(network)
 }
 
+# Generate networks and simulate node loss ---------------------------------
+# Network parameters
+N <- 50 # Nodes in the network
+nodes.removed <- 1 # Nodes to remove
+n.removed <- 1 # How many to remove at a time
+edge.prob <- 0.1 # initial probability of edges in the random starting network
+
+# Simulation parameters
+n.rep <- 100 # number of repetitions
+burn.in <- 50 # number of days to burn in
+
+# Results storage
+den.orig <- matrix(NA, n.rep)
+den.rewired <- matrix(NA, n.rep)
+mean.deg.orig <- matrix(NA, n.rep)
+mean.deg.rewired <- matrix(NA, n.rep)
+# assort
+# clust
+
+for(zz in 1:n.rep){
+  # Generate a random starting network
+  network.orig <- rgraph(N, tprob = edge.prob, 
+                         mode = "graph") # gives undirected graph
+  # Run the baseline model
+  for (i in 1:burn.in) {
+    output <- update.network()
+    network.orig <- output$network
+    traits.orig <- output$traits
+  }
+  # Save original params
+  assort.orig[zz,] <- assortment.continuous(network.orig, traits.orig, weighted=FALSE)$r
+  den.orig[zz,] <- gden(network.orig, mode="graph")
+  mean.deg.orig[zz,] <- mean(degree(network.orig, gmode="graph",ignore.eval=TRUE))
+  clust.orig[zz,] <- gtrans(network.orig,mode="graph")
+  # Do a removal and rewire
+  # Save final params
+  # End
+}
+
+
+
 
 
 
