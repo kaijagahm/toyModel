@@ -241,12 +241,6 @@ runSim <- function(tmax = 50, # length of time over which to run the simulation
       }else if(edgesInfo[edge, "action"] == "lose"){
         edgeID <- get.edge.ids(newG, vp = pair, directed = F) # XXXXXXXXXXXX
         newG <- delete_edges(graph = newG, edgeID) 
-        # XXX UNBELIEVABLE--WHY DOES DELETE_EDGES WORK DIFFERENTLY THAN ADD_EDGES??????
-        # In the cold light of day I see that this is probably because igraph 
-        # allows for networks with more than one edge between nodes. Okay, 
-        # I concede that this is logical. But they should be clearer about it 
-        # in the documentation, and they should allow two options for 
-        # specifying this.
       }else{
         newG <- newG
       }
