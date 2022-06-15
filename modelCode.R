@@ -29,15 +29,13 @@ connectIsolatedNodes <- function(g, allow){
 
 # Get only unique edges (since we're dealing with an undirected graph)
 uniqueEdges <- function(n){
-  df <- expand.grid(from = 1:n, to = 1:n) %>%
-    mutate(inOrder = case_when(from == to ~ NA_character_, 
-                               from > to ~ paste(to, from),
-                               from < to ~ paste(from, to))) %>%
-    filter(!is.na(inOrder)) %>% # remove self edges
-    group_by(inOrder) %>%
-    slice(1) %>% # take only one edge for each
-    ungroup() %>%
-    select(-inOrder)
+  df <- expand.grid(from = 1:n, to = 1:n)
+  df <- df[which(df[,1] < df[,2]), , drop = FALSE]
+  return(df)
+}
+
+dedup <- function(df){
+  df <- df[which(df[,1] < df[,2]), , drop = FALSE]
   return(df)
 }
 
