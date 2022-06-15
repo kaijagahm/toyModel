@@ -43,15 +43,15 @@ dedup <- function(df, triangle = "upper"){
 # Function for baseline network dynamics
 # Repeat this number of times specified for desired burn.in, in a for loop. Each time, spitting out the network, and the history of the edges.
 update.network <- function(ind, # starting index for the history list.
-                           history, # list of history, since this function depends on being able to look a few timesteps back.
+                           network.history, # list of history, since this function depends on being able to look a few timesteps back.
                            add00 = 0.1, 
                            lose01 = 0.3, 
                            add10 = 0.3, 
                            lose11 = 0.1){ 
   
   # establish history two steps back
-  prev <- history[[ind-1]]
-  prevprev <- history[[ind-2]]
+  prev <- network.history[[ind-1]]
+  prevprev <- network.history[[ind-2]]
   new <- prev
   
   # sort edges by history, two back
@@ -68,7 +68,7 @@ update.network <- function(ind, # starting index for the history list.
   new[h10] <- ifelse(rands[h10] < add10, 1, 0)
   
   # Symmetrize the matrix
-  new <- symmetrize(new, rule = "upper") # copy the upper triangle over the lower triangle
+  new <- as.matrix(symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
   
-  return(network)
+  return(new)
 }
