@@ -28,14 +28,26 @@ connectIsolatedNodes <- function(g, allow){
 }
 
 # Get only unique edges (since we're dealing with an undirected graph)
-uniqueEdges <- function(n){
+uniqueEdges <- function(n, triangle = "upper"){
   df <- expand.grid(from = 1:n, to = 1:n)
-  df <- df[which(df[,1] < df[,2]), , drop = FALSE]
+  if(triangle == "upper"){
+    df <- df[which(df[,1] < df[,2]), , drop = FALSE] 
+  }else if(triangle == "lower"){
+    df <- df[which(df[,1] < df[,2]), , drop = FALSE] 
+  }else{
+    stop("Triangle must be 'upper' or 'lower'")
+  }
   return(df)
 }
 
-dedup <- function(df){
-  df <- df[which(df[,1] < df[,2]), , drop = FALSE]
+dedup <- function(df, triangle = "upper"){
+  if(triangle == "upper"){
+    df <- df[which(df[,1] < df[,2]), , drop = FALSE]
+  }else if(triangle == "lower"){
+    df <- df[which(df[,1] > df[,2]), , drop = FALSE]
+  }else{
+    stop("Triangle must be 'upper' or 'lower'")
+  }
   return(df)
 }
 
