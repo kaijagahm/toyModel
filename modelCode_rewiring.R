@@ -19,7 +19,10 @@ source("supportingFunctions.R") # all the functions that will be used in the mai
 
 # remove.network.node -----------------------------------------------------
 # Function to remove a node from the network.
-remove.network.node <- function(network, n.removed = 1, id = NULL, pm) {
+remove.network.node <- function(network, n.removed = 1, id = NULL, 
+                                pm, # both bereaved 
+                                ps, # one bereaved, one not
+                                pa) { # neither bereaved #XXX relate this to p00 etc
   # Calculate population size in the current network
   N <- nrow(network)
   
@@ -33,14 +36,16 @@ remove.network.node <- function(network, n.removed = 1, id = NULL, pm) {
   # First, capture the edges involving the removed individual
   edges <- network[del, -del] # row ([del,]), excluding self col ([,-del])
   bereaved <- which(edges == 1) # nodes that were connected to the removed individual
+  non.bereaved <- which(edges == 0)
   
   # Remove the node
   network <- network[-del,] # rows 
   network <- network[,-del] # columns
   N <- N-1 # update the population size.
   
-  # Now update the network:
-  # First get potential edges, as edge list
+  # Now update the network.
+  # First, allocate edges between mutually bereaved nodes (2nd-degree rewiring)
+  # get potential edges, as edge list
   potentials <- which(network[bereaved, bereaved, # edges between second-degree connections
                               drop = FALSE] == 0, # keep format. Only edges that didn't already exist.
                       arr.ind = T)
@@ -58,15 +63,30 @@ remove.network.node <- function(network, n.removed = 1, id = NULL, pm) {
     network <- symmetrize(network, rule = "upper") # copy upper triangle
   }
   
-  # then randomly allocate edges between newly disconnected nodes and other nodes
-  potentials <- which(network[which(edges==1),which(edges==0),drop=FALSE]==0,arr.ind=T)
-  if (length(potentials) > 0) {
-    new.edge <- sample(c(0,1),nrow(potentials),prob=c(1-ps,ps),replace=T)
-    network[which(edges==1),which(edges==0)][cbind(potentials[,1],potentials[,2])] <- new.edge
-    network[which(edges==0),which(edges==1)][cbind(potentials[,2],potentials[,1])] <- new.edge
+  # Second, allocate edges between bereaved and non-bereaved nodes
+  potentials <- which(network[bereaved, non.bereaved, drop = FALSE] == 0, 
+                      arr.ind = T)
+  if(length(potentials) > 0){
+    potentials <- dedup(potentials, triangle = "upper")
+    new.edge <- sample(c(0,1), nrow(potentials), 
+                       prob = c(1-ps, ps), replace = T)
+    
+    network[bereaved, non.bereaved][potentials] <- new.edge
+    network <- symmetrize(network, rule = "upper")
   }
   
-  # return
+  # Finally, allocate edges between mutually non-bereaved nodes
+  potentials <- which(network[non.bereaved, non.bereaved, drop = FALSE] == 0, 
+                      arr.ind = T)
+  if(length(potentials) > 0){
+    potentials <- dedup(potentials, triangle = "upper")
+    new.edge <- sample(c(0,1), nrow(potentials), 
+                       prob = c(1-pa, pa), replace = T)
+    
+    network[non.bereaved, non.bereaved][potentials] <- new.edge
+    network <- symmetrize(network, rule = "upper")
+  }
+  
   return(network)
 }
 
@@ -93,7 +113,7 @@ for(zz in 1:n.rep){
   # Generate a random starting network
   network.orig <- rgraph(N, tprob = edge.prob, 
                          mode = "graph") # gives undirected graph, already symmetrized.
-
+  
   # Run the baseline model
   ## set up the history
   network.history <- vector(mode = "list", length = burn.in)
