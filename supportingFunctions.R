@@ -72,3 +72,77 @@ update.network <- function(ind, # starting index for the history list.
   
   return(new)
 }
+
+
+# remove.network.node -----------------------------------------------------
+# Function to remove a node from the network.
+remove.network.node <- function(network, n.removed = 1, id = NULL, 
+                                pm, # both bereaved 
+                                ps, # one bereaved, one not
+                                pa) { # neither bereaved #XXX relate this to p00 etc
+  # Calculate population size in the current network
+  N <- nrow(network)
+  
+  # Assuming no node is specified, remove a random node. `del` is the node to remove.
+  if(is.null(id)){
+    del <- sample(1:N, n.removed, replace = FALSE)
+  }else{
+    del <- id
+  }
+  
+  # First, capture the edges involving the removed individual
+  edges <- network[del, -del] # row ([del,]), excluding self col ([,-del])
+  bereaved <- which(edges == 1) # nodes that were connected to the removed individual
+  non.bereaved <- which(edges == 0)
+  
+  # Remove the node
+  network <- network[-del,] # rows 
+  network <- network[,-del] # columns
+  N <- N-1 # update the population size.
+  
+  # Now update the network.
+  # First, allocate edges between mutually bereaved nodes (2nd-degree rewiring)
+  # get potential edges, as edge list
+  potentials <- which(network[bereaved, bereaved, # edges between second-degree connections
+                              drop = FALSE] == 0, # keep format. Only edges that didn't already exist.
+                      arr.ind = T)
+  
+  # then allocate a new edge vs not
+  if(nrow(potentials) > 0){
+    potentials <- dedup(potentials, triangle = "upper") # only the upper triangle
+    
+    # for each edge, decide whether it forms or not (0 or 1)
+    new.edge <- sample(c(0,1), nrow(potentials), 
+                       prob = c(1-pm, pm), replace = T)
+    
+    # update the network
+    network[bereaved, bereaved][potentials] <- new.edge # update edges between bereaved with either a 0 or a 1
+    network <- symmetrize(network, rule = "upper") # copy upper triangle
+  }
+  
+  # Second, allocate edges between bereaved and non-bereaved nodes
+  potentials <- which(network[bereaved, non.bereaved, drop = FALSE] == 0, 
+                      arr.ind = T)
+  if(length(potentials) > 0){
+    potentials <- dedup(potentials, triangle = "upper")
+    new.edge <- sample(c(0,1), nrow(potentials), 
+                       prob = c(1-ps, ps), replace = T)
+    
+    network[bereaved, non.bereaved][potentials] <- new.edge
+    network <- symmetrize(network, rule = "upper")
+  }
+  
+  # Finally, allocate edges between mutually non-bereaved nodes
+  potentials <- which(network[non.bereaved, non.bereaved, drop = FALSE] == 0, 
+                      arr.ind = T)
+  if(length(potentials) > 0){
+    potentials <- dedup(potentials, triangle = "upper")
+    new.edge <- sample(c(0,1), nrow(potentials), 
+                       prob = c(1-pa, pa), replace = T)
+    
+    network[non.bereaved, non.bereaved][potentials] <- new.edge
+    network <- symmetrize(network, rule = "upper")
+  }
+  
+  return(network)
+}
