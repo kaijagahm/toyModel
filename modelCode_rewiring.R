@@ -19,14 +19,9 @@ source("supportingFunctions.R") # all the functions that will be used in the mai
 
 # remove.network.node -----------------------------------------------------
 # Function to remove a node from the network.
-## n.removed tells how many nodes to remove. Default is 1. Later, expand this to multiple nodes and define them according to a probability density function.
-## id is the id of the node to remove. Default is NULL --> remove a random node.
-## network is the starting network, to be perturbed.
-remove.network.node <- function(network, n.removed = 1, id = NULL) {
-  # Check that `network` is an adjacency matrix.
-  
-  # Calculate pop size
-  N <- length(V(network))
+remove.network.node <- function(network, n.removed = 1, id = NULL, pm) {
+  # Calculate population size in the current network
+  N <- nrow(network)
   
   # Assuming no node is specified, remove a random node. `del` is the node to remove.
   if(is.null(id)){
@@ -36,25 +31,31 @@ remove.network.node <- function(network, n.removed = 1, id = NULL) {
   }
   
   # First, capture the edges involving the removed individual
-  edges <- network[del, -del]
+  edges <- network[del, -del] # row ([del,]), excluding self col ([,-del])
+  bereaved <- which(edges == 1) # nodes that were connected to the removed individual
   
   # Remove the node
-  network <- network[-del,] # rows
+  network <- network[-del,] # rows 
   network <- network[,-del] # columns
-  N <- N-1 # update population size.
+  N <- N-1 # update the population size.
   
   # Now update the network:
-  # First get potential edges
-  potentials <- which(network[which(edges==1), which(edges==1), # edges between second-degree connections
-                              drop = FALSE] == 0, # keep format. Only edges that didn't exist.
-                      arr.ind = T) # get row and column indices
+  # First get potential edges, as edge list
+  potentials <- which(network[bereaved, bereaved, # edges between second-degree connections
+                              drop = FALSE] == 0, # keep format. Only edges that didn't already exist.
+                      arr.ind = T)
   
   # then allocate a new edge vs not
-  if(length(potentials) > 0){
-    potentials <- potentials[which(potentials[,1] < potentials[,2]),,drop=FALSE]  # to avoid duplicates
-    new.edge <- sample(c(0,1),nrow(potentials),prob=c(1-pm,pm),replace=T)
-    network[which(edges==1),which(edges==1)][cbind(potentials[,1],potentials[,2])] <- new.edge
-    network[which(edges==1),which(edges==1)][cbind(potentials[,2],potentials[,1])] <- new.edge
+  if(nrow(potentials) > 0){
+    potentials <- dedup(potentials, triangle = "upper") # only the upper triangle
+    
+    # for each edge, decide whether it forms or not (0 or 1)
+    new.edge <- sample(c(0,1), nrow(potentials), 
+                       prob = c(1-pm, pm), replace = T)
+    
+    # update the network
+    network[bereaved, bereaved][potentials] <- new.edge # update edges between bereaved with either a 0 or a 1
+    network <- symmetrize(network, rule = "upper") # copy upper triangle
   }
   
   # then randomly allocate edges between newly disconnected nodes and other nodes
@@ -91,18 +92,18 @@ mean.deg.rewired <- matrix(NA, n.rep)
 for(zz in 1:n.rep){
   # Generate a random starting network
   network.orig <- rgraph(N, tprob = edge.prob, 
-                         mode = "graph") # gives undirected graph
+                         mode = "graph") # gives undirected graph, already symmetrized.
 
   # Run the baseline model
   ## set up the history
-  history <- vector(mode = "list", length = burn.in)
-  history[[1]] <- matrix(0, N, N) # blank network so we can look 2 timesteps back
-  history[[2]] <- network.orig # baseline network
+  network.history <- vector(mode = "list", length = burn.in)
+  network.history[[1]] <- matrix(0, N, N) # blank network so we can look 2 timesteps back
+  network.history[[2]] <- network.orig # baseline network
   
   ## run the loop, starting at index 3
   for(i in 3:burn.in){
-    output <- update.network(ind = i, history = history)
-    history[[i]] <- output # update history
+    output <- update.network(ind = i, network.history)
+    network.history[[i]] <- output # update history
   }
   
   # Save parameters as they stand for the end of the burn-in, before perturbation
