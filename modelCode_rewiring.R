@@ -46,19 +46,14 @@ dedup <- function(df, triangle = "upper"){
 # update.network ----------------------------------------------------------
 # Function for baseline network dynamics
 # Repeat this number of times specified for desired burn.in, in a for loop. Each time, spitting out the network, and the history of the edges.
-update.network <- function(ind, history, 
-                           # p gain an edge given not connected in either of the 
-                           # previous two time steps
+update.network <- function(ind, # starting index for the history list.
+                           history, # list of history, since this function depends on being able to look a few timesteps back.
                            add00 = 0.1, 
-                           # p lose an edge given connected in prev time step but 
-                           # not prev prev
                            lose01 = 0.3, 
-                           # p gain an edge given connected in prev prev time step 
-                           # but not prev
                            add10 = 0.3, 
-                           # p lose edge given connected in previous 2 time steps
                            lose11 = 0.1){ 
-  # get history two steps back
+  
+  # establish history two steps back
   prev <- history[[ind-1]]
   prevprev <- history[[ind-2]]
   new <- prev
@@ -79,15 +74,7 @@ update.network <- function(ind, history,
   # Symmetrize the matrix
   new <- symmetrize(new, rule = "upper") # copy the upper triangle over the lower triangle
   
-  
-  
-  # determine fate of each edge: operate on all the edges, and then disregard one half of the triangle
-  
-  # update network
-  network <- network # and do some stuff involving edgeInfo.
-  
-  return(list(network = network, edgeInfo = edgeInfo))
-  
+  return(network)
 }
 
 # remove.network.node -----------------------------------------------------
@@ -165,24 +152,26 @@ for(zz in 1:n.rep){
   # Generate a random starting network
   network.orig <- rgraph(N, tprob = edge.prob, 
                          mode = "graph") # gives undirected graph
-  # XXX connect unconnected nodes
-  
+
   # Run the baseline model
+  ## set up the history
   history <- vector(mode = "list", length = burn.in)
-  history[[1]] <- matrix(0, N, N) 
-  history[[2]] <- matrix(0, N, N)
+  history[[1]] <- matrix(0, N, N) # blank network so we can look 2 timesteps back
+  history[[2]] <- network.orig # baseline network
   
+  ## run the loop, starting at index 3
   for(i in 3:burn.in){
     output <- update.network(ind = i, history = history)
-    network.orig <- output
+    history[[i]] <- output # update history
   }
   
-  # Save original params
-  assort.orig[zz,] <- assortment.continuous(network.orig, traits.orig, weighted=FALSE)$r
-  den.orig[zz,] <- gden(network.orig, mode="graph")
-  mean.deg.orig[zz,] <- mean(degree(network.orig, gmode="graph",ignore.eval=TRUE))
-  clust.orig[zz,] <- gtrans(network.orig,mode="graph")
-  # Do a removal and rewire
+  # Save parameters as they stand for the end of the burn-in, before perturbation
+  # assort.orig[zz,] <- assortment.continuous(network.orig, traits.orig, weighted=FALSE)$r
+  # den.orig[zz,] <- gden(network.orig, mode="graph")
+  # mean.deg.orig[zz,] <- mean(degree(network.orig, gmode="graph",ignore.eval=TRUE))
+  # clust.orig[zz,] <- gtrans(network.orig,mode="graph")
+  
+  # Removal/perturbation and rewiring
   # Save final params
   # End
 }
