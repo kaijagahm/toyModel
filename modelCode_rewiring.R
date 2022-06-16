@@ -27,6 +27,10 @@ edge.prob <- 0.1 # initial probability of edges in the random starting network
 # Simulation parameters
 n.rep <- 100 # number of repetitions
 burn.in <- 50 # number of days to burn in
+burn.out <- 50 # number of days to continue after the perturbation
+pm <- 0.3
+ps <- 0.1
+pa <- 0.2
 
 # Results storage
 den.orig <- matrix(NA, n.rep)
@@ -43,7 +47,7 @@ for(zz in 1:n.rep){
   
   # Run the baseline model
   ## set up the history
-  network.history <- vector(mode = "list", length = burn.in)
+  network.history <- vector(mode = "list", length = burn.in+1+burn.out)
   network.history[[1]] <- matrix(0, N, N) # blank network so we can look 2 timesteps back
   network.history[[2]] <- network.orig # baseline network
   
@@ -53,15 +57,19 @@ for(zz in 1:n.rep){
     network.history[[i]] <- output # update history
   }
   
-  # Save parameters as they stand for the end of the burn-in, before perturbation
-  # assort.orig[zz,] <- assortment.continuous(network.orig, traits.orig, weighted=FALSE)$r
-  # den.orig[zz,] <- gden(network.orig, mode="graph")
-  # mean.deg.orig[zz,] <- mean(degree(network.orig, gmode="graph",ignore.eval=TRUE))
-  # clust.orig[zz,] <- gtrans(network.orig,mode="graph")
-  
   # Removal/perturbation and rewiring
-  # Save final params
-  # End
+  rewired <- remove.network.node(network = network.history[[burn.in]], 
+                                 n.removed = 1, pm = pm, ps = ps, pa = pa)
+  network.history[[burn.in+1]] <- rewired
+  
+  # XXX can't do this because the networks are now different sizes.
+  # # Continue baseline dynamics following removal
+  # ## run the loop, starting at index burn.in + 2
+  # for(i in burn.in+2:length(network.history)){
+  #   output <- update.network(ind = i, network.history)
+  #   network.history[[i]] <- output # update history
+  # }
+  # # End
 }
 
 
