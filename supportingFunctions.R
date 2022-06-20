@@ -49,10 +49,20 @@ update.network <- function(ind, # starting index for the history list.
                            add10 = 0.3, 
                            lose11 = 0.1){ 
   
-  # establish history two steps back
-  prev <- network.history[[ind-1]]
-  prevprev <- network.history[[ind-2]]
-  new <- prev
+  # Establish a network history, two steps back
+  if(ind == 1){
+    stop("network must have at least some history--ind cannot be = 1")
+  }else if(ind == 2){
+    prev <- network.history[[ind-1]]
+    # create a matrix of zeroes if the history doesn't exist that far back
+    prevprev <- matrix(data = 0, 
+                       nrow = nrow(prev), ncol = ncol(prev))
+    new <- prev
+  }else if(ind > 2){
+    prev <- network.history[[ind-1]]
+    prevprev <- network.history[[ind-2]]
+    new <- prev
+  }
   
   # sort edges by history, two back
   h00 <- dedup(which(prev == prevprev & prev == 0, arr.ind = T), "upper")
@@ -144,5 +154,5 @@ remove.network.node <- function(network, n.removed = 1, id = NULL,
     network <- symmetrize(network, rule = "upper")
   }
   
-  return(network)
+  return(list(network = network, removed = del))
 }
