@@ -72,10 +72,10 @@ update.network <- function(ind, # starting index for the history list.
   rands <- matrix(runif(N*N, 0, 1), nrow = N) # select random numbers from here
   
   # Modify the new adjacency matrix (upper triangle only)
-  new[h00] <- ifelse(rands[h00] < add00, 1, 0)
-  new[h11] <- ifelse(rands[h11] < lose11, 0, 1)
-  new[h01] <- ifelse(rands[h01] < lose01, 0, 1)
-  new[h10] <- ifelse(rands[h10] < add10, 1, 0)
+  new[h00] <- ifelse(rands[h00] < rnorm(1, add00), 1, 0)
+  new[h11] <- ifelse(rands[h11] < rnorm(1, lose11), 0, 1)
+  new[h01] <- ifelse(rands[h01] < rnorm(1, lose01), 0, 1)
+  new[h10] <- ifelse(rands[h10] < rnorm(1, add10), 1, 0)
   
   # Symmetrize the matrix
   new <- as.matrix(symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
@@ -154,5 +154,5 @@ remove.network.node <- function(network, n.removed = 1, id = NULL,
     network <- symmetrize(network, rule = "upper")
   }
   
-  return(list(network = network, removed = del))
+  return(list(network = network, del = del))
 }
