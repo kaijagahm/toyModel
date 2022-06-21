@@ -72,10 +72,10 @@ update.network <- function(ind, # starting index for the history list.
   rands <- matrix(runif(N*N, 0, 1), nrow = N) # select random numbers from here
   
   # Modify the new adjacency matrix (upper triangle only)
-  new[h00] <- ifelse(rands[h00] < rnorm(1, add00), 1, 0)
-  new[h11] <- ifelse(rands[h11] < rnorm(1, lose11), 0, 1)
-  new[h01] <- ifelse(rands[h01] < rnorm(1, lose01), 0, 1)
-  new[h10] <- ifelse(rands[h10] < rnorm(1, add10), 1, 0)
+  new[h00] <- ifelse(rands[h00] < abs(rnorm(1, add00, sd = 0.1)), 1, 0)
+  new[h11] <- ifelse(rands[h11] < abs(rnorm(1, lose11, sd = 0.1)), 0, 1)
+  new[h01] <- ifelse(rands[h01] < abs(rnorm(1, lose01, sd = 0.1)), 0, 1)
+  new[h10] <- ifelse(rands[h10] < abs(rnorm(1, add10, sd = 0.1)), 1, 0)
   
   # Symmetrize the matrix
   new <- as.matrix(symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
@@ -86,10 +86,11 @@ update.network <- function(ind, # starting index for the history list.
 
 # remove.network.node -----------------------------------------------------
 # Function to remove a node from the network.
-remove.network.node <- function(network, n.removed = 1, id = NULL, 
+remove.network.node <- function(network, previous, n.removed = 1, id = NULL, 
                                 pm, # both bereaved 
                                 ps, # one bereaved, one not
-                                pa) { # neither bereaved #XXX relate this to p00 etc
+                                pa, # neither bereaved
+                                histMultiplier) {
   # Calculate population size in the current network
   N <- nrow(network)
   
@@ -104,7 +105,7 @@ remove.network.node <- function(network, n.removed = 1, id = NULL,
   edges <- network[del, -del] # row ([del,]), excluding self col ([,-del])
   bereaved <- which(edges == 1) # nodes that were connected to the removed individual
   non.bereaved <- which(edges == 0)
-  
+
   # Remove the node
   network <- network[-del,] # rows 
   network <- network[,-del] # columns
@@ -117,14 +118,17 @@ remove.network.node <- function(network, n.removed = 1, id = NULL,
                               drop = FALSE] == 0, # keep format. Only edges that didn't already exist.
                       arr.ind = T)
   
+  
   # then allocate a new edge vs not
   if(nrow(potentials) > 0){
     potentials <- dedup(potentials, triangle = "upper") # only the upper triangle
-    
+
     # for each edge, decide whether it forms or not (0 or 1)
-    new.edge <- sample(c(0,1), nrow(potentials), 
-                       prob = c(1-pm, pm), replace = T)
-    
+    probs <- abs(rnorm(nrow(potentials), mean = pm, sd = 0.1))
+    multiply <- previous[bereaved, bereaved][potentials]*histMultiplier
+    probs.adjusted <- probs*multiply
+    new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
+
     # update the network
     network[bereaved, bereaved][potentials] <- new.edge # update edges between bereaved with either a 0 or a 1
     network <- symmetrize(network, rule = "upper") # copy upper triangle
