@@ -120,7 +120,7 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
   
   
   # then allocate a new edge vs not
-  if(nrow(potentials) > 0){
+  if(length(potentials) > 0){
     potentials <- dedup(potentials, triangle = "upper") # only the upper triangle
 
     # for each edge, decide whether it forms or not (0 or 1)
@@ -135,12 +135,16 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
   }
   
   # Second, allocate edges between bereaved and non-bereaved nodes
+  
   potentials <- which(network[bereaved, non.bereaved, drop = FALSE] == 0, 
                       arr.ind = T)
   if(length(potentials) > 0){
     potentials <- dedup(potentials, triangle = "upper")
-    new.edge <- sample(c(0,1), nrow(potentials), 
-                       prob = c(1-ps, ps), replace = T)
+    # for each edge, decide whether it forms or not (0 or 1)
+    probs <- abs(rnorm(nrow(potentials), mean = ps, sd = 0.1))
+    multiply <- previous[bereaved, non.bereaved][potentials]*histMultiplier
+    probs.adjusted <- probs*multiply
+    new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
     
     network[bereaved, non.bereaved][potentials] <- new.edge
     network <- symmetrize(network, rule = "upper")
@@ -151,8 +155,12 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
                       arr.ind = T)
   if(length(potentials) > 0){
     potentials <- dedup(potentials, triangle = "upper")
-    new.edge <- sample(c(0,1), nrow(potentials), 
-                       prob = c(1-pa, pa), replace = T)
+    
+    # for each edge, decide whether it forms or not (0 or 1)
+    probs <- abs(rnorm(nrow(potentials), mean = pa, sd = 0.1))
+    multiply <- previous[non.bereaved, non.bereaved][potentials]*histMultiplier
+    probs.adjusted <- probs*multiply
+    new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
     
     network[non.bereaved, non.bereaved][potentials] <- new.edge
     network <- symmetrize(network, rule = "upper")
