@@ -36,8 +36,9 @@ ps <- 0.1
 pa <- 0.2
 add00 <- 0.1
 lose01 <- 0.3 
-add10 <- 0.3
-lose11 <- 0.1
+add10 <- 0.2
+lose11 <- 0.2
+histMultiplier <- 1.2
 
 # Results storage
 den.orig <- matrix(NA, n.rep)
@@ -61,7 +62,7 @@ for(zz in 1:n.rep){
   ## run the loop, starting at index 3
   for(i in 3:burn.in){
     output <- update.network(ind = i, network.history, add00 = add00, 
-                             add10 = add10, add01 = add01, add11 = add11)
+                             add10 = add10, lose01 = lose01, lose11 = lose11)
     network.history[[i]] <- output # update history
   }
   
@@ -84,7 +85,7 @@ for(zz in 1:n.rep){
   
   for(i in (burn.in+2):length(revised.history)){
     output <- update.network(ind = i, revised.history, add00 = add00, 
-                             add10 = add10, add01 = add01, add11 = add11)
+                             add10 = add10, lose01 = lose01, lose11 = lose11)
     revised.history[[i]] <- output # update history
   }
 }
@@ -119,7 +120,7 @@ for (i in 1:length(full.history.graphs)) {
 library(animation)
 saveGIF({
   for (i in 1:length(pList)) plot(pList[[i]])
-}, movie.name = "networkSim.gif", interval = 0.2)
+}, movie.name = "networkSim.gif", interval = 0.1)
 
 
 
