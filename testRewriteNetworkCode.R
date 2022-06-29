@@ -108,10 +108,4 @@ edges <- edges %>%
 edges <- vultureUtils::consecEdges(edgeList = edges, consecThreshold = coOccurrenceThreshold) 
 # XXX this still doesn't work to remove the grouping variable, but I just can't be bothered to fix it right now because it's such a pain. Come back to this.
 
-unweighted <- vultureUtils::makeGraphs(edges = edges, fullData = feedingPoints, interval = "3 days", dateTimeStart = "2021-01-01 00:00:00", dateTimeEnd = "2021-12-31 11:59:59", weighted = FALSE)$graphs
-
-weighted <- vultureUtils::makeGraphs(edges = edges, fullData = feedingPoints, interval = "3 days", dateTimeStart = "2021-01-01 00:00:00", dateTimeEnd = "2021-12-31 11:59:59", weighted = TRUE)$graphs
-
-
-# Let's examine the unweighted networks, aggregated over different spans of time
-
+save(edges, file = "data/feedingEdges2021.Rda")
