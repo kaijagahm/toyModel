@@ -105,7 +105,11 @@ edges <- edges %>%
   filter(ID1 < ID2)
 
 # Now create a list where the edge only stays if it occurred in at least `coOccurrenceThreshold` consecutive time steps
-edges <- vultureUtils::consecEdges(edgeList = edges, consecThreshold = coOccurrenceThreshold) 
+feedingEdges2021 <- vultureUtils::consecEdges(edgeList = edges, consecThreshold = coOccurrenceThreshold) %>%
+  ungroup()
 # XXX this still doesn't work to remove the grouping variable, but I just can't be bothered to fix it right now because it's such a pain. Come back to this.
 
-save(edges, file = "data/feedingEdges2021.Rda")
+feedingPoints2021 <- feedingPoints
+
+save(feedingEdges2021, file = "data/feedingEdges2021.Rda")
+save(feedingPoints2021, file = "data/feedingPoints2021.Rda")
