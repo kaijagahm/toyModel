@@ -7,12 +7,11 @@ library(data.table) #for the manual section where i build the SN myself
 library(moveVis)
 library(dplyr)
 library(igraph)
-library(vultureUtils)
+library(vultureUtils) # self-written package. Can be installed using devtools::install_github("kaijagahm/vultureUtils").
 library(lubridate)
 
 # key parameter values
-DistThreshold=50 #---at what distance two indi are considered interacting
-TimeThreshold='10 minutes' # timegroups - temporally overlapping
+distThreshold <- 50 # distance at which vultures are considered interacting
 coOccurrenceThreshold <- 2 #minimal number of coocurences for considering a viable pair- 
 inIsraelThreshold <- 0.33 # proportion of days tracked that must fall in Israel
 
@@ -45,22 +44,23 @@ datDF <- vultureUtils::removeUnnecessaryVars(datDF)
 
 datDF$dateOnly <- as.Date(as.character(datDF$timestamp))
 
-# Remove out of Israel locations: select only points falling in Israel
-datDFIsrael <- vultureUtils::maskIsrael(dataset = datDF, crs = "WGS84")
+# Get Israel mask
+israelMask <- sf::st_read("data/maskIsrael.kml")
 
-# Remove vultures that have fewer than 1/3 of their duration recorded inside Israel
-longEnoughIndivs <- vultureUtils::mostlyInIsrael(dataset = datDF, israelDataset = datDFIsrael, thresh = inIsraelThreshold, dateCol = "dateOnly")
+# Remove out of Israel locations: select only points falling in Israel
+datDFIsrael <- vultureUtils::maskData(dataset = datDF, mask = israelMask, longCol = "location_long.1", latCol = "location_lat.1", crs = "WGS84")
+
+# Remove vultures that have less than 1/3 of their duration recorded inside Israel
+longEnoughIndivs <- vultureUtils::mostlyInMask(dataset = datDF, maskedDataset = datDFIsrael, thresh = inIsraelThreshold, dateCol = "dateOnly")
 datDF <- datDF %>% # using datDF because we don't want to actually restrict it to Israel yet
   filter(trackId %in% longEnoughIndivs)
 
-# Clean the data and extract metadata
+# Filter
 ## by setting speedUpper to 5, we are restricting this to non-flight interactions.
-cleaned <- vultureUtils::cleanAndMetadata(df = datDFIsrael, speedUpper = 5)
-filteredData <- cleaned$filteredData
-tagsMetadata <- cleaned$tagsMetadata
+filteredData <- vultureUtils::filterLocs(df = datDF, speedThreshUpper = 5)
 
-cleanedIsrael <- vultureUtils::maskIsrael(dataset = filteredData, longCol = "location_long.1",
-                                          latCol = "location_lat.1", crs = "WGS84")
+# Now mask again to remove the out-of-Israel points.
+cleanedIsrael <- vultureUtils::maskData(dataset = filteredData, mask = israelMask, longCol = "location_long.1", latCol = "location_lat.1", crs = "WGS84")
 
 # Import feeding site locations and buffer them
 feedingSites <- read.csv("data/FeedingSites_AllActiveSouthNorth.csv")
@@ -73,41 +73,7 @@ roostPolygons <- sf::st_read("data/AllRoostPolygons.kml", quiet = TRUE) %>%
 # Exclude any points that fall within a roost polygon
 feedingPoints <- cleanedIsrael[lengths(sf::st_intersects(cleanedIsrael, roostPolygons)) == 0,]
 
-# Convert to UTM
-feedingPoints <- feedingPoints %>%
-  dplyr::mutate(lon = sf::st_coordinates(.)[,1], # save lat/long coordinates, just in case we need them later.
-                lat = sf::st_coordinates(.)[,2]) %>%
-  # convert to UTM (this will be useful for calculating distance locally.)
-  sf::st_transform(32636) %>%
-  dplyr::mutate(utmE = sf::st_coordinates(.)[,1], # get utm coords as separate columns.
-                utmN = sf::st_coordinates(.)[,2]) %>%
-  sf::st_drop_geometry() # drop geometry, making this just a data frame, so that spatsoc will work.
-
-# Convert the `timestamp` column to POSIXct
-feedingPoints <- feedingPoints %>%
-  dplyr::mutate(timestamp = as.POSIXct(timestamp, tz = "UTC"))
-data.table::setDT(feedingPoints) # convert to a data.table so we can proceed with spatsoc
-
-# Group these points into timegroups using `spatsoc`
-spatsoc::group_times(feedingPoints, datetime = 'timestamp', threshold = TimeThreshold) 
-
-# Group into point groups
-spatsoc::group_pts(feedingPoints, threshold = DistThreshold, id = 'trackId', 
-          coords = c('utmE', 'utmN'), timegroup = 'timegroup')
-
-# Generate edge lists by timegroup
-edges <- edge_dist(DT = feedingPoints, threshold = DistThreshold, id = "trackId",
-                   coords = c('utmE', "utmN"), timegroup = "timegroup",
-                   returnDist = TRUE, fillNA = FALSE)
-
-# Remove duplicates
-edges <- edges %>%
-  filter(ID1 < ID2)
-
-# Now create a list where the edge only stays if it occurred in at least `coOccurrenceThreshold` consecutive time steps
-feedingEdges2021 <- vultureUtils::consecEdges(edgeList = edges, consecThreshold = coOccurrenceThreshold) %>%
-  ungroup()
-# XXX this still doesn't work to remove the grouping variable, but I just can't be bothered to fix it right now because it's such a pain. Come back to this.
+feedingEdges2021 <- vultureUtils::spaceTimeGroups(dataset = feedingPoints, distThreshold = distThreshold, consecThreshold = 2)
 
 feedingPoints2021 <- feedingPoints
 
