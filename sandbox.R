@@ -32,7 +32,7 @@ vultureUtils::makeGIF(plots, fileName = "2021_20Days.gif", interval = 0.2)
 
 # Examine network metrics vs. time window ---------------------------------
 # Let's look at e.g. network density
-timeWindows <- seq(1, 365/2, by = 20)
+timeWindows <- seq(1, 50, by = 10)
 intervals <- paste(timeWindows, "days")
 dts <- "2021-01-01 00:00:00"
 dte <- "2021-12-31 11:59:59"
