@@ -20,31 +20,9 @@ library(igraph)
 library(fitdistrplus)
 
 # load data
-load("data/feedingEdges2021.Rda") # derived from testRewriteNetworkCode.R
-load("data/feedingPoints2021.Rda") # derived from testRewriteNetworkCode.R
-```
-
-Now that we've loaded the data and packages, time to subset the data to only southern individuals. Properly, I should compute home ranges or something to determine where each individual hangs out. But I'm going to just take individuals' mean latitude for now, and use that as a proxy for their space use, since we know the southern population is generally distinct from the two northern populations. Note that this metric will confound vultures in the Golan and in the Carmel, but since both of those are northern populations that I don't need to deal with, I won't worry about that for now.
-
-### Preparing the data
-
-```{r}
-# Filter to include only southern individuals
-# get mean latitude for each individual
-indivs <- feedingPoints2021 %>%
-  sf::st_drop_geometry() %>%
-  dplyr::select(trackId, location_long.1, location_lat.1) %>%
-  dplyr::group_by(trackId) %>%
-  dplyr::summarize(mnlat = mean(location_lat.1))
-
-# get southern individuals
-southern <- indivs %>%
-  dplyr::filter(mnlat < 32) %>%
-  dplyr::pull(trackId)
-
-# restrict the edgelist to only southern individuals
-southernEdges2021 <- feedingEdges2021 %>%
-  dplyr::filter(ID1 %in% southern & ID2 %in% southern)
+load("data/feedingEdges2021.Rda") # derived from getCoFeedingData_2021.R
+load("data/feedingPoints2021.Rda") # derived from getCoFeedingData_2021.R
+load("data/southernEdges2021.Rda") # derived from getCoFeedingData_2021.R
 ```
 
 Now I'm going to use these data to create networks and do some calculations, in order to parameterize the model.

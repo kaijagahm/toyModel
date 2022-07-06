@@ -79,3 +79,24 @@ feedingPoints2021 <- feedingPoints
 
 save(feedingEdges2021, file = "data/feedingEdges2021.Rda")
 save(feedingPoints2021, file = "data/feedingPoints2021.Rda")
+
+# Subset the data to only southern individuals. Properly, I should compute home ranges or something to determine where each individual hangs out. But I'm going to just take individuals' mean latitude for now, and use that as a proxy for their space use, since we know the southern population is generally distinct from the two northern populations. Note that this metric will confound vultures in the Golan and in the Carmel, but since both of those are northern populations that I don't need to deal with, I won't worry about that for now.
+
+# Filter to include only southern individuals
+# get mean latitude for each individual
+indivs <- feedingPoints2021 %>%
+  sf::st_drop_geometry() %>%
+  dplyr::select(trackId, location_long.1, location_lat.1) %>%
+  dplyr::group_by(trackId) %>%
+  dplyr::summarize(mnlat = mean(location_lat.1))
+
+# get southern individuals
+southern <- indivs %>%
+  dplyr::filter(mnlat < 32) %>%
+  dplyr::pull(trackId)
+
+# restrict the edgelist to only southern individuals
+southernEdges2021 <- feedingEdges2021 %>%
+  dplyr::filter(ID1 %in% southern & ID2 %in% southern)
+
+save(southernEdges2021, file = "data/southernEdges2021.Rda")
