@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This document shows how I used the newly-written `vultureUtils` package, along with real vulture movement data from the year 2021 (co-feeding network only!) to explore and parameterize my toy rewiring model.
 
-```{r}
+```{r echo = FALSE, message = FALSE, warning = FALSE}
 # load packages
 library(vultureUtils) # this can be downloaded using devtools::install_github("kaijagahm/vultureUtils").
 library(tidyverse)
@@ -25,6 +25,8 @@ load("data/feedingPoints2021.Rda") # derived from testRewriteNetworkCode.R
 ```
 
 Now that we've loaded the data and packages, time to subset the data to only southern individuals. Properly, I should compute home ranges or something to determine where each individual hangs out. But I'm going to just take individuals' mean latitude for now, and use that as a proxy for their space use, since we know the southern population is generally distinct from the two northern populations. Note that this metric will confound vultures in the Golan and in the Carmel, but since both of those are northern populations that I don't need to deal with, I won't worry about that for now.
+
+### Preparing the data
 
 ```{r}
 # Filter to include only southern individuals
@@ -47,6 +49,8 @@ southernEdges2021 <- feedingEdges2021 %>%
 
 Now I'm going to use these data to create networks and do some calculations, in order to parameterize the model.
 
+Going to do a sensitivity analysis over various increments, ranging from 1 to 31 days.
+
 ```{r}
 # First, create a range of plausible day increments. We don't want to integrate the networks over more than a month or less than a day, so let's do 1-31 days, incrementing by 4.
 
@@ -54,16 +58,18 @@ interval.num <- seq(1, 31, by = 4)
 interval <- paste(interval.num, "days")
 ```
 
+### Probability distributions for edge gain and loss
+
 ```{r}
 # Now I want to get the probability distributions for edge gain/loss, given two steps of history.
 histdfs <- vector(mode = "list", length = length(interval))
 
 for(i in 1:length(interval)){
-  graphs <- makeGraphs(edges = southernEdges2021, interval = interval[i], 
+  graphs <- vultureUtils::makeGraphs(edges = southernEdges2021, interval = interval[i], 
                        dateTimeStart = "2021-01-01 00:00:00",
                        dateTimeEnd = "2021-12-31 11:59:00",
                        weighted = FALSE, allVertices = TRUE)$graphs
-  probs <- computeProbs(graphs)
+  probs <- vultureUtils::computeProbs(graphs)
   histdfs[[i]] <- probs
 }
 
@@ -90,6 +96,7 @@ sensData %>%
   theme_minimal()+
   scale_color_viridis_d()
 ```
+
 Okay, cool. We don't see a ton of difference between the different time windows, but in general the 1- and 6-day intervals seem to look a bit more distinct. Leaning toward going with those anyway, but let's also take a look at these probabilities over time.
 
 ```{r}
@@ -101,16 +108,18 @@ sensData %>%
   scale_color_viridis_d()
 ```
 
-Okay, this is a bit more chaotic. Seems like there might be some seasonality going on here. But I don't see any clear patterns emerging, and the darker lines (shorter time windows) seem to be a bit more steady and constant than the longer time windows, which is another argument for picking a shorter time window.
+This is a bit more chaotic. Seems like there might be some seasonality going on here. But I don't see any clear patterns emerging, and the darker lines (shorter time windows) seem to be a bit more steady and constant than the longer time windows, which is another argument for picking a shorter time window.
 
 Importantly, I don't see any super strong trends over time here. This is nice because it means I can carry on modeling these probabilities as distributions, without adding time dependence.
+
+### Network density
 
 Now, let's take a look at how the network density changes over time. This will be another way to decide which time interval to use for the model.
 
 ```{r}
 # Now let's take a look at the network densities and see how they change.
 intervalGraphs <- lapply(interval, function(x){
-  graphs <- makeGraphs(edges = southernEdges2021, interval = x, 
+  graphs <- vultureUtils::makeGraphs(edges = southernEdges2021, interval = x, 
                        dateTimeStart = "2021-01-01 00:00:00",
                        dateTimeEnd = "2021-12-31 11:59:00",
                        weighted = FALSE, allVertices = TRUE)$graphs
@@ -148,9 +157,11 @@ densities %>%
   scale_color_viridis_d()+
   facet_wrap(~interval)
 ```
+
 This graph is a bit hard to interpret. But in general, it looks like the pattern gets a lot noisier as the time window gets bigger, which is kind of interesting and counter-intuitive. I want the graph density to remain roughly constant, so I'm going to look at choosing one of the shorter time windows. I'm more inclined to go with 5 days (or 5, for simplicity) rather than 1 day. 
 
 Let's look at the distribution of densities for 1 day and 5 days.
+
 ```{r}
 densities %>%
   filter(interval %in% c("1 days", "5 days")) %>%
@@ -163,6 +174,8 @@ densities %>%
 When we have a 1-day time window, the reason the density is so consistent is that it's so close to zero, because almost no edges are present at any given time. It's just small groups of individuals feeding together each day.
 
 5 days is looking like a more reasonable distribution. Note that this assumes we're allowing isolated nodes and that most individuals aren't connected on any given day. Hopefully adding the density parameters to the model will help with that.
+
+### Compute parameter/distribution values
 
 Calculate some parameter values to use in the model:
 
@@ -211,10 +224,69 @@ plot(fit_add10, las = 1)
 plot(fit_lose01, las = 1)
 plot(fit_lose11, las = 1)
 ```
+
 Looks like the beta distribution is a good fit for `add00` and `lose11`, but not a good fit for the other two. I guess we'll just use uniform for the other two.
 
 For 5-day intervals, the beta distribution parameters for `add00` are `r fit_add00$estimate[1]` and `r fit_add00$estimate[2]`. The beta distribution parameters for `add10` are `r fit_add10$estimate[1]` and `r fit_add10$estimate[2]`.
 
 The mean network density is `r density_5day`.
 
+### How much does an individual's degree fluctuate?
 
+We're working with only the 5-day data here.
+
+```{r}
+graphs <- intervalGraphs[[2]]
+```
+
+Compute individuals' degree over time.
+
+```{r}
+degrees <- lapply(graphs, igraph::degree)
+
+# make a data frame
+degreeData <- map2(.x = degrees, .y = names(degrees), .f = function(.x, .y){
+  df <- as.data.frame(.x) %>%
+    setNames(., "degree") %>%
+    mutate(trackId = row.names(.)) %>%
+    mutate(earlyDate = lubridate::ymd(.y))
+}) %>%
+  data.table::rbindlist()
+```
+
+Plot the results:
+
+```{r}
+degreeData %>%
+  ggplot(aes(x = earlyDate, y = degree, col = trackId))+
+  geom_smooth(se = FALSE)+
+  theme_minimal()+
+  theme(legend.position = "none")
+```
+
+At first glance, individuals' degrees seem to be relatively stable over time.
+
+What about the degree distribution of the population over time?
+
+```{r}
+degreeData %>%
+  ggplot(aes(x = degree, col = as.factor(earlyDate)))+
+  geom_density()+
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_color_viridis_d()
+```
+
+This isn't very informative. What happens if we remove individuals with degree 0, i.e. individuals not participating in feeding interactions during this time slice?
+
+```{r}
+degreeData %>%
+  filter(degree != 0) %>%
+  ggplot(aes(x = degree, col = as.factor(earlyDate)))+
+  geom_density()+
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_color_viridis_d()
+```
+
+Huh, even after removing the individuals with degree 0, we still have an incredibly right-skewed degree distribution.
