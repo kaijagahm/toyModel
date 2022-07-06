@@ -44,10 +44,10 @@ dedup <- function(df, triangle = "upper"){
 # Repeat this number of times specified for desired burn.in, in a for loop. Each time, spitting out the network, and the history of the edges.
 update.network <- function(ind, # starting index for the history list.
                            network.history, # list of history, since this function depends on being able to look a few timesteps back.
-                           add00 = 0.1, 
+                           add00 = c(0.5, 7), 
                            lose01 = 0.3, 
                            add10 = 0.3, 
-                           lose11 = 0.1){ 
+                           lose11 = c(0.3, 0.3)){ 
   
   # Establish a network history, two steps back
   if(ind == 1){
@@ -72,10 +72,10 @@ update.network <- function(ind, # starting index for the history list.
   rands <- matrix(runif(N*N, 0, 1), nrow = N) # select random numbers from here
   
   # Modify the new adjacency matrix (upper triangle only)
-  new[h00] <- ifelse(rands[h00] < abs(rnorm(1, add00, sd = 0.1)), 1, 0)
-  new[h11] <- ifelse(rands[h11] < abs(rnorm(1, lose11, sd = 0.1)), 0, 1)
-  new[h01] <- ifelse(rands[h01] < abs(rnorm(1, lose01, sd = 0.1)), 0, 1)
-  new[h10] <- ifelse(rands[h10] < abs(rnorm(1, add10, sd = 0.1)), 1, 0)
+  new[h00] <- ifelse(rands[h00] < rbeta(1, shape1 = add00[1], shape2 = add00[2]), 1, 0)
+  new[h11] <- ifelse(rands[h11] < rbeta(1, shape1 = lose11[1], shape2 = lose11[2]), 0, 1)
+  new[h01] <- ifelse(rands[h01] < runif(1), 0, 1) # using uniform probabilities for 
+  new[h10] <- ifelse(rands[h10] < runif(1), 1, 0)
   
   # Symmetrize the matrix
   new <- as.matrix(symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
