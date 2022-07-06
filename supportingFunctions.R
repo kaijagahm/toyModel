@@ -23,16 +23,16 @@ uniqueEdges <- function(n, triangle = "upper"){
 }
 
 # dedup -------------------------------------------------------------------
-dedup <- function(df, triangle = "upper"){
-  checkmate::assertDataFrame(df)
+dedup <- function(mat, triangle = "upper"){
+  checkmate::assertMatrix(mat)
   if(triangle == "upper"){
-    df <- df[which(df[,1] < df[,2]), , drop = FALSE]
+    mat <- mat[which(mat[,1] < mat[,2]), , drop = FALSE]
   }else if(triangle == "lower"){
-    df <- df[which(df[,1] > df[,2]), , drop = FALSE]
+    mat <- mat[which(mat[,1] > mat[,2]), , drop = FALSE]
   }else{
     stop("Triangle must be 'upper' or 'lower'")
   }
-  return(df)
+  return(mat)
 }
 
 # update.network ----------------------------------------------------------
@@ -47,8 +47,8 @@ update.network <- function(ind, # starting index for the history list.
   
   # argument checks
   checkmate::assertNumeric(add00, len = 2)
-  checmkate::assertNumeric(add11, len = 2)
-  checmkate::assertNumeric(lose01, len = 1)
+  checkmate::assertNumeric(lose11, len = 2)
+  checkmate::assertNumeric(lose01, len = 1)
   checkmate::assertNumeric(add10, len = 1)
   checkmate::assertList(network.history)
   checkmate::assertNumeric(ind, len = 1)
@@ -73,6 +73,7 @@ update.network <- function(ind, # starting index for the history list.
   h11 <- dedup(which(prev == prevprev & prev == 1, arr.ind = T), "upper")
   h01 <- dedup(which(prevprev < prev, arr.ind = T), "upper")
   h10 <- dedup(which(prevprev > prev, arr.ind = T), "upper")
+  N <- nrow(prev)
   rands <- matrix(runif(N*N, 0, 1), nrow = N) # select random numbers from here
   
   # Modify the new adjacency matrix (upper triangle only)
@@ -131,6 +132,8 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
     probs <- abs(rnorm(nrow(potentials), mean = pm, sd = 0.1))
     multiply <- previous[bereaved, bereaved][potentials]*histMultiplier
     probs.adjusted <- probs*multiply
+    probs.adjusted[probs.adjusted > 1] <- 1
+    probs.adjusted[probs.adjusted < 0] <- 0
     new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
 
     # update the network
@@ -148,6 +151,8 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
     probs <- abs(rnorm(nrow(potentials), mean = ps, sd = 0.1))
     multiply <- previous[bereaved, non.bereaved][potentials]*histMultiplier
     probs.adjusted <- probs*multiply
+    probs.adjusted[probs.adjusted > 1] <- 1
+    probs.adjusted[probs.adjusted < 0] <- 0
     new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
     
     network[bereaved, non.bereaved][potentials] <- new.edge
@@ -164,6 +169,8 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
     probs <- abs(rnorm(nrow(potentials), mean = pa, sd = 0.1))
     multiply <- previous[non.bereaved, non.bereaved][potentials]*histMultiplier
     probs.adjusted <- probs*multiply
+    probs.adjusted[probs.adjusted > 1] <- 1
+    probs.adjusted[probs.adjusted < 0] <- 0
     new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
     
     network[non.bereaved, non.bereaved][potentials] <- new.edge
