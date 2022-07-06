@@ -3,19 +3,14 @@
 # MODIFIED: 2022-06-15
 # Just separating these out to keep the other code cleaner and avoid too much scrolling.
 
-library(tidyverse)
-library(igraph)
-library(ggraph)
-library(tidygraph)
-library(data.table)
 library(checkmate)
-library(sna)
 
 # Define functions --------------------------------------------------------
 
 # Small utility functions for deduplicating edges
 # uniqueEdges -------------------------------------------------------------
 uniqueEdges <- function(n, triangle = "upper"){
+  checkmate::assertNumeric(n, len = 1)
   df <- expand.grid(from = 1:n, to = 1:n)
   if(triangle == "upper"){
     df <- df[which(df[,1] < df[,2]), , drop = FALSE] 
@@ -29,6 +24,7 @@ uniqueEdges <- function(n, triangle = "upper"){
 
 # dedup -------------------------------------------------------------------
 dedup <- function(df, triangle = "upper"){
+  checkmate::assertDataFrame(df)
   if(triangle == "upper"){
     df <- df[which(df[,1] < df[,2]), , drop = FALSE]
   }else if(triangle == "lower"){
@@ -48,6 +44,14 @@ update.network <- function(ind, # starting index for the history list.
                            lose01 = 0.3, 
                            add10 = 0.3, 
                            lose11 = c(0.3, 0.3)){ 
+  
+  # argument checks
+  checkmate::assertNumeric(add00, len = 2)
+  checmkate::assertNumeric(add11, len = 2)
+  checmkate::assertNumeric(lose01, len = 1)
+  checkmate::assertNumeric(add10, len = 1)
+  checkmate::assertList(network.history)
+  checkmate::assertNumeric(ind, len = 1)
   
   # Establish a network history, two steps back
   if(ind == 1){
@@ -131,7 +135,7 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
 
     # update the network
     network[bereaved, bereaved][potentials] <- new.edge # update edges between bereaved with either a 0 or a 1
-    network <- symmetrize(network, rule = "upper") # copy upper triangle
+    network <- sna::symmetrize(network, rule = "upper") # copy upper triangle
   }
   
   # Second, allocate edges between bereaved and non-bereaved nodes
@@ -147,7 +151,7 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
     new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
     
     network[bereaved, non.bereaved][potentials] <- new.edge
-    network <- symmetrize(network, rule = "upper")
+    network <- sna::symmetrize(network, rule = "upper")
   }
   
   # Finally, allocate edges between mutually non-bereaved nodes
@@ -163,7 +167,7 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
     new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
     
     network[non.bereaved, non.bereaved][potentials] <- new.edge
-    network <- symmetrize(network, rule = "upper")
+    network <- sna::symmetrize(network, rule = "upper")
   }
   
   return(list(network = network, del = del))
