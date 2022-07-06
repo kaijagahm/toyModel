@@ -1,0 +1,37 @@
+---
+title: "Evaluate Model Results"
+author: "Kaija Gahm"
+date: "7/6/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Get the model function, and also load the real life data.
+
+```{r}
+source("modelCode_rewiring.R")
+load("data/southernEdges2021.Rda")
+```
+
+Make 5-day graphs from the real data:
+
+```{r}
+realGraphs <- vultureUtils::makeGraphs(edges = southernEdges2021, interval = "5 days", 
+                       dateTimeStart = "2021-01-01 00:00:00",
+                       dateTimeEnd = "2021-12-31 11:59:00",
+                       weighted = FALSE, allVertices = TRUE)$graphs
+```
+
+
+Run the model with 82 individuals:
+
+```{r} 
+modelGraphs <- runModel(N = 82, burn.in = 50, burn.out = 50) %>%
+  lapply(., function(x){
+    igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+  })
+```
+
