@@ -1,0 +1,220 @@
+---
+title: "Parameterizing the Model"
+author: "Kaija Gahm"
+date: '2022-07-05'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document shows how I used the newly-written `vultureUtils` package, along with real vulture movement data from the year 2021 (co-feeding network only!) to explore and parameterize my toy rewiring model.
+
+```{r}
+# load packages
+library(vultureUtils) # this can be downloaded using devtools::install_github("kaijagahm/vultureUtils").
+library(tidyverse)
+library(data.table)
+library(igraph)
+library(fitdistrplus)
+
+# load data
+load("data/feedingEdges2021.Rda") # derived from testRewriteNetworkCode.R
+load("data/feedingPoints2021.Rda") # derived from testRewriteNetworkCode.R
+```
+
+Now that we've loaded the data and packages, time to subset the data to only southern individuals. Properly, I should compute home ranges or something to determine where each individual hangs out. But I'm going to just take individuals' mean latitude for now, and use that as a proxy for their space use, since we know the southern population is generally distinct from the two northern populations. Note that this metric will confound vultures in the Golan and in the Carmel, but since both of those are northern populations that I don't need to deal with, I won't worry about that for now.
+
+```{r}
+# Filter to include only southern individuals
+# get mean latitude for each individual
+indivs <- feedingPoints2021 %>%
+  sf::st_drop_geometry() %>%
+  dplyr::select(trackId, location_long.1, location_lat.1) %>%
+  dplyr::group_by(trackId) %>%
+  dplyr::summarize(mnlat = mean(location_lat.1))
+
+# get southern individuals
+southern <- indivs %>%
+  dplyr::filter(mnlat < 32) %>%
+  dplyr::pull(trackId)
+
+# restrict the edgelist to only southern individuals
+southernEdges2021 <- feedingEdges2021 %>%
+  dplyr::filter(ID1 %in% southern & ID2 %in% southern)
+```
+
+Now I'm going to use these data to create networks and do some calculations, in order to parameterize the model.
+
+```{r}
+# First, create a range of plausible day increments. We don't want to integrate the networks over more than a month or less than a day, so let's do 1-31 days, incrementing by 4.
+
+interval.num <- seq(1, 31, by = 4)
+interval <- paste(interval.num, "days")
+```
+
+```{r}
+# Now I want to get the probability distributions for edge gain/loss, given two steps of history.
+histdfs <- vector(mode = "list", length = length(interval))
+
+for(i in 1:length(interval)){
+  graphs <- makeGraphs(edges = southernEdges2021, interval = interval[i], 
+                       dateTimeStart = "2021-01-01 00:00:00",
+                       dateTimeEnd = "2021-12-31 11:59:00",
+                       weighted = FALSE, allVertices = TRUE)$graphs
+  probs <- computeProbs(graphs)
+  histdfs[[i]] <- probs
+}
+
+# Make the list into a single data frame. First, add the time interval to each list element:
+histdfs <- map2(.x = histdfs, .y = interval, .f = function(.x, .y){
+  .x$interval = factor(.y, levels = .y)
+  return(.x)
+})
+
+# Then, bind the list into a data frame for plotting.
+sensData <- data.table::rbindlist(histdfs) %>%
+  mutate(earlyDate = lubridate::ymd(earlyDate))
+```
+
+Now we can use the data from this sensitivity analysis to graph two things: the probability distribution for `add00`, `add10`, `lose01`, and `lose11`; and the change in each of these metrics over time (to see if we need to add time dependence to the model.)
+
+First, let's look at the probability distributions.
+
+```{r}
+sensData %>%
+  ggplot(aes(x = prob, col = interval))+
+  geom_density(size = 1)+
+  facet_wrap(~type)+
+  theme_minimal()+
+  scale_color_viridis_d()
+```
+Okay, cool. We don't see a ton of difference between the different time windows, but in general the 1- and 6-day intervals seem to look a bit more distinct. Leaning toward going with those anyway, but let's also take a look at these probabilities over time.
+
+```{r}
+sensData %>%
+  ggplot(aes(x = earlyDate, y = prob, col = interval))+
+  geom_smooth(se = FALSE)+
+  facet_wrap(~type)+
+  theme_minimal()+
+  scale_color_viridis_d()
+```
+
+Okay, this is a bit more chaotic. Seems like there might be some seasonality going on here. But I don't see any clear patterns emerging, and the darker lines (shorter time windows) seem to be a bit more steady and constant than the longer time windows, which is another argument for picking a shorter time window.
+
+Importantly, I don't see any super strong trends over time here. This is nice because it means I can carry on modeling these probabilities as distributions, without adding time dependence.
+
+Now, let's take a look at how the network density changes over time. This will be another way to decide which time interval to use for the model.
+
+```{r}
+# Now let's take a look at the network densities and see how they change.
+intervalGraphs <- lapply(interval, function(x){
+  graphs <- makeGraphs(edges = southernEdges2021, interval = x, 
+                       dateTimeStart = "2021-01-01 00:00:00",
+                       dateTimeEnd = "2021-12-31 11:59:00",
+                       weighted = FALSE, allVertices = TRUE)$graphs
+  
+})
+
+# compile the density information
+densities <- map2(.x = intervalGraphs, .y = interval, .f = function(.x, .y){
+  lapply(.x, igraph::edge_density) %>% 
+    unlist() %>% 
+    as.data.frame() %>%
+    setNames(., "density") %>%
+    mutate(earlyDate = row.names(.),
+           interval = factor(.y, levels = .y),
+           earlyDate = lubridate::ymd(earlyDate))
+}) %>% 
+  data.table::rbindlist()
+```
+
+Time to visualize the density information.
+
+```{r}
+# plot the density information
+densities %>%
+  ggplot(aes(x = earlyDate, y = density, col = interval))+
+  geom_smooth(se = FALSE)+
+  theme_minimal()+
+  scale_color_viridis_d()
+
+densities %>%
+  ggplot(aes(x = earlyDate, y = density, col = interval))+
+  geom_point(alpha = 0.5)+
+  geom_smooth(se = FALSE)+
+  theme_minimal()+
+  scale_color_viridis_d()+
+  facet_wrap(~interval)
+```
+This graph is a bit hard to interpret. But in general, it looks like the pattern gets a lot noisier as the time window gets bigger, which is kind of interesting and counter-intuitive. I want the graph density to remain roughly constant, so I'm going to look at choosing one of the shorter time windows. I'm more inclined to go with 5 days (or 5, for simplicity) rather than 1 day. 
+
+Let's look at the distribution of densities for 1 day and 5 days.
+```{r}
+densities %>%
+  filter(interval %in% c("1 days", "5 days")) %>%
+  ggplot(aes(x = density))+
+  geom_density()+
+  theme_minimal()+
+  facet_wrap(~interval)
+```
+
+When we have a 1-day time window, the reason the density is so consistent is that it's so close to zero, because almost no edges are present at any given time. It's just small groups of individuals feeding together each day.
+
+5 days is looking like a more reasonable distribution. Note that this assumes we're allowing isolated nodes and that most individuals aren't connected on any given day. Hopefully adding the density parameters to the model will help with that.
+
+Calculate some parameter values to use in the model:
+
+```{r}
+# Get the mean network density for 1 day and 6 days
+density_1day <- densities %>%
+  filter(interval == "1 days") %>%
+  pull(density) %>%
+  mean()
+
+density_5day <- densities %>%
+  filter(interval == "5 days") %>%
+  pull(density) %>%
+  mean()
+
+# Get beta distributions to fit each of the probabilities.
+probs <- sensData %>%
+  dplyr::filter(!is.nan(prob),
+         !is.na(prob)) %>%
+  dplyr::mutate(prob = (prob - min(prob) + 0.001) / (max(prob) - min(prob) + 0.002)) %>%
+  dplyr::filter(interval == "5 days")
+
+fit_add00 <- fitdist(probs %>% 
+                       filter(type == "add00") %>% 
+                       pull(prob), 
+                     "beta")
+
+fit_add10 <- fitdist(probs %>% 
+                       filter(type == "add10") %>% 
+                       pull(prob), 
+                     "beta")
+
+fit_lose01 <- fitdist(probs %>% 
+                        filter(type == "lose01") %>% 
+                        pull(prob), 
+                      "beta")
+
+fit_lose11 <- fitdist(probs %>% 
+                        filter(type == "lose11") %>% 
+                        pull(prob), 
+                      "beta")
+
+# Visualize each of the distributions to examine fit.
+plot(fit_add00, las = 1)
+plot(fit_add10, las = 1)
+plot(fit_lose01, las = 1)
+plot(fit_lose11, las = 1)
+```
+Looks like the beta distribution is a good fit for `add00` and `lose11`, but not a good fit for the other two. I guess we'll just use uniform for the other two.
+
+For 5-day intervals, the beta distribution parameters for `add00` are `r fit_add00$estimate[1]` and `r fit_add00$estimate[2]`. The beta distribution parameters for `add10` are `r fit_add10$estimate[1]` and `r fit_add10$estimate[2]`.
+
+The mean network density is `r density_5day`.
+
+
