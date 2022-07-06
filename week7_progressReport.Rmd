@@ -26,7 +26,7 @@ The output of the model is a list of graphs, one for each time step. I have also
 ## 3. Diagram and model equations for your base model, and for any extensions you are actively working on. (No need to list all the ideas that you probably won’t have time to pursue in the next few weeks.)
 
 ```{r echo = F}
-knitr::include_graphics("modelDiagram_week7.jpg")
+knitr::include_graphics("data/modelDiagram_week7.jpg")
 ```
 I really struggled with representing this in a diagram, so I hope this makes sense! The box on the left is meant to convey that the assignment of an edge between individuals occurs for each dyad, not just for two of the `n` individuals (nodes). All of these edges together make up the Day 1 network. If isolated nodes are not allowed, each isolated node in the Day 1 network is connected randomly to one other node. We initialize a dummy "Day 0 network" with no edges to allow for memory going back two steps for the Day 2 network. The pink arrow represents gain of edges, which can happen with probability `baseAdd` or `lostAdd` depending on the history of the edge in question. The blue arrow represents loss of edges, which can happen with probability `newLose` or `alwaysLose` depending of the history of the edge in question. For each subsequent day, isolated nodes are connected according to the same procedure as in Day 1. This is repeated for `tmax` days. Graphs and edge info for each day's network are stored and returned by the function.
 
