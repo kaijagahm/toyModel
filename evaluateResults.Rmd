@@ -18,25 +18,25 @@ library(tidyverse)
 library(gifski)
 library(ggraph)
 source("modelFunction_rewiring.R")
-load("data/southernEdges2021.Rda")
+load("data/toUse.Rda")
 ```
 
 Make 5-day graphs from the real data:
 
 ```{r}
-realGraphs <- vultureUtils::makeGraphs(edges = southernEdges2021, interval = "5 days", 
-                       dateTimeStart = "2021-01-01 00:00:00",
-                       dateTimeEnd = "2021-12-31 11:59:00",
+realGraphs <- vultureUtils::makeGraphs(edges = toUse, interval = "5 days", 
+                       dateTimeStart = "2020-01-01 00:00:00",
+                       dateTimeEnd = "2021-09-01 11:59:00",
                        weighted = FALSE, allVertices = TRUE)$graphs
+nIndivs <- length(igraph::V(realGraphs[[1]]))
 ```
 
 We have `length(realGraphs)` = `r length(realGraphs)` timestep graphs.
 
-
-Run the model with 82 individuals. Setting the burn.in to `length(realGraphs)` = `r length(realGraphs)` because for the purposes of testing the baseline dynamics, we don't actually care about the removal aspect.
+Run the model with `r nIndivs` individuals. Setting the burn.in to `length(realGraphs)` = `r length(realGraphs)` because for the purposes of testing the baseline dynamics, we don't actually care about the removal aspect.
 
 ```{r} 
-modelGraphs <- runModel(N = 82, burn.in = length(realGraphs), doRemoval = FALSE) %>%
+modelGraphs <- runModel(N = nIndivs, burn.in = length(realGraphs), doRemoval = FALSE) %>%
   lapply(., function(x){
     igraph::graph_from_adjacency_matrix(x, mode = "undirected")
   })
@@ -45,7 +45,7 @@ modelGraphs <- runModel(N = 82, burn.in = length(realGraphs), doRemoval = FALSE)
 # Double check that we have the same dimensions throughout
 unique(unlist(lapply(modelGraphs, length)))
 unique(unlist(lapply(realGraphs, length)))
-# Good, both are 82.
+# Good, both are the same.
 ```
 
 ## Compare results from the real and modeled networks.
@@ -221,7 +221,6 @@ coords <- data.frame(name = names(igraph::V(realGraphs[[1]])),
                      y = rnorm(n = length(igraph::V(realGraphs[[1]]))))
 ```
 
-
 ```{r, animation.hook="gifski", dev='png', interval = 0.2, echo = FALSE}
 for(i in 1:length(realGraphs)){
   p <- tidygraph::as_tbl_graph(realGraphs[[i]], nodes = coords$name) %>%
@@ -231,7 +230,7 @@ for(i in 1:length(realGraphs)){
     theme_graph()+
     scale_color_viridis_d()+
     theme(legend.position = "none")+
-    ggtitle("real networks")
+    ggtitle(paste("real networks: day", i))
   print(p)
 }
 ```
@@ -245,11 +244,40 @@ for(i in 1:length(modelGraphs)){
     theme_graph()+
     scale_color_viridis_d()+
     theme(legend.position = "none")+
-    ggtitle("model networks")
+    ggtitle(paste("model networks: day", i))
   print(p)
 }
 ```
 
+### And now more animations, but this time letting ggraph choose the layout for each one.
+
+```{r, animation.hook="gifski", dev='png', interval = 0.2, echo = FALSE}
+for(i in 1:length(realGraphs)){
+  p <- tidygraph::as_tbl_graph(realGraphs[[i]], nodes = coords$name) %>%
+    ggraph(layout = "kk")+
+    geom_edge_link()+
+    geom_node_point(size = 4, aes(col = name))+
+    theme_graph()+
+    scale_color_viridis_d()+
+    theme(legend.position = "none")+
+    ggtitle(paste("real networks: day", i))
+  print(p)
+}
+```
+
+```{r, animation.hook="gifski", dev='png', interval = 0.2, echo = FALSE}
+for(i in 1:length(modelGraphs)){
+  p <- tidygraph::as_tbl_graph(modelGraphs[[i]], nodes = coords$name) %>%
+    ggraph(layout = "kk")+
+    geom_edge_link()+
+    geom_node_point(size = 4, aes(col = coords$name))+
+    theme_graph()+
+    scale_color_viridis_d()+
+    theme(legend.position = "none")+
+    ggtitle(paste("model networks: day", i))
+  print(p)
+}
+```
 
 
 
