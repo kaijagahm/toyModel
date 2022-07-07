@@ -4,6 +4,7 @@
 # Just separating these out to keep the other code cleaner and avoid too much scrolling.
 
 library(checkmate)
+library(dplyr)
 
 # Define functions --------------------------------------------------------
 
@@ -83,7 +84,7 @@ update.network <- function(ind, # starting index for the history list.
   new[h10] <- ifelse(rands[h10] < runif(1), 1, 0)
   
   # Symmetrize the matrix
-  new <- as.matrix(symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
+  new <- as.matrix(sna::symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
   
   return(new)
 }

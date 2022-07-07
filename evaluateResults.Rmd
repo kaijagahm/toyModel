@@ -6,13 +6,16 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, out.width = "100%")
 ```
+
+## Create the networks
 
 Get the model function, and also load the real life data.
 
-```{r}
-source("modelCode_rewiring.R")
+```{r warning = FALSE, message = FALSE}
+library(tidyverse)
+source("modelFunction_rewiring.R")
 load("data/southernEdges2021.Rda")
 ```
 
@@ -25,13 +28,212 @@ realGraphs <- vultureUtils::makeGraphs(edges = southernEdges2021, interval = "5 
                        weighted = FALSE, allVertices = TRUE)$graphs
 ```
 
+We have `length(realGraphs)` = `r length(realGraphs)` timestep graphs.
 
-Run the model with 82 individuals:
+
+Run the model with 82 individuals. Setting the burn.in to `length(realGraphs)` = `r length(realGraphs)` because for the purposes of testing the baseline dynamics, we don't actually care about the removal aspect.
 
 ```{r} 
-modelGraphs <- runModel(N = 82, burn.in = 50, burn.out = 50) %>%
+modelGraphs <- runModel(N = 82, burn.in = length(realGraphs), doRemoval = FALSE) %>%
   lapply(., function(x){
     igraph::graph_from_adjacency_matrix(x, mode = "undirected")
   })
+
+
+# Double check that we have the same dimensions throughout
+unique(unlist(lapply(modelGraphs, length)))
+unique(unlist(lapply(realGraphs, length)))
+# Good, both are 82.
 ```
+
+## Compare results from the real and modeled networks.
+
+### 1) Degree Distributions
+
+Obtain degree information: 
+```{r}
+fn <- function(x){
+  igraph::degree(x) %>%
+    as.data.frame()
+}
+degrees_real <- lapply(realGraphs, fn) %>% 
+  setNames(., NULL) %>%
+  data.table::rbindlist(idcol = "timestep") %>% 
+  mutate(type = "real")
+
+degrees_model <- lapply(modelGraphs, fn) %>%
+  setNames(., NULL) %>%
+  data.table::rbindlist(idcol = "timestep") %>%
+  mutate(type = "model")
+
+# create a single data frame for plotting
+degrees <- bind_rows(degrees_real, degrees_model) %>%
+  rename("degree" = ".")
+```
+
+Make plots:
+
+
+```{r}
+degrees %>%
+  mutate(timestep = as.factor(timestep)) %>%
+  ggplot(aes(x = degree, col = timestep))+
+  geom_density()+
+  facet_wrap(~type)+
+  theme_minimal()+
+  theme(legend.position = "none")
+```
+
+These look worryingly different. Let's see what happens if we remove the 0-degree individuals from the real distributions. Although we're still going to have to figure out *why* there are so many more isolated nodes in the real data than in the model data, and how to replicate that in the model.
+
+Removing individuals with degree 0:
+
+```{r}
+degrees %>%
+  filter(degree > 0) %>%
+  mutate(timestep = as.factor(timestep)) %>%
+  ggplot(aes(x = degree, col = timestep))+
+  geom_density()+
+  facet_wrap(~type)+
+  theme_minimal()+
+  theme(legend.position = "none")
+```
+
+Okay, these are more similar now, and the model isn't wildly off. But there's still clearly some behavior going on here that we need to work harder on replicating in the model.
+
+Mean and variation in degree distribution over time:
+
+```{r}
+degrees %>%
+  ggplot(aes(x = timestep, y = degree))+
+  geom_point(alpha = 0.2) +
+  geom_smooth()+
+  facet_wrap(~type)+
+  theme_minimal()+
+  theme(legend.position = "none")
+```
+
+Ah, once again, we have a lot more individuals with degree 0 in the real data than in the model. If we remove the individuals with degree 0, we get something a tad more reasonable:
+
+```{r}
+degrees %>%
+  filter(degree > 0) %>%
+  ggplot(aes(x = timestep, y = degree))+
+  geom_point(alpha = 0.2) +
+  geom_smooth()+
+  facet_wrap(~type)+
+  theme_minimal()+
+  theme(legend.position = "none")
+```
+
+But this reinforces the idea that we have to do a better job modeling the disconnected individuals in the model.
+
+Ooh, what happens if I look at individuals' participation in feeding events--do they only feed every couple days? Maybe I could add a parameter to automatically exclude them from the network if they've participated for the past X days. Look into this.
+
+### 2) Network density
+
+Calculate densities:
+
+```{r}
+density_real <- lapply(realGraphs, igraph::edge_density) %>% 
+  setNames(., NULL) %>%
+  unlist() %>%
+  as.data.frame() %>%
+  mutate(type = "real",
+         timestep = 1:n())
+
+density_model <- lapply(modelGraphs, igraph::edge_density) %>%
+  setNames(., NULL) %>%
+  unlist() %>%
+  as.data.frame() %>%
+  mutate(type = "model",
+         timestep = 1:n())
+
+# create a single data frame for plotting
+densities <- bind_rows(density_real, density_model) %>%
+  rename("density" = ".")
+```
+
+Plot densities:
+
+```{r}
+densities %>%
+  ggplot(aes(x = timestep, y = density, col = type))+
+  geom_smooth()+
+  theme_minimal()
+```
+
+Once again, this seems to confirm that the modeled networks are much more dense than the real networks.
+
+How is it possible that we arrived at this when the probability of generating a new edge was drawn from real distributions? What am I missing?
+
+### 3) Clustering
+
+Following Farine 2021, going to measure transitivity in these graphs.
+
+```{r}
+trans_real <- lapply(realGraphs, igraph::transitivity) %>% 
+  setNames(., NULL) %>%
+  unlist() %>%
+  as.data.frame() %>%
+  mutate(type = "real",
+         timestep = 1:n())
+
+trans_model <- lapply(modelGraphs, igraph::transitivity) %>%
+  setNames(., NULL) %>%
+  unlist() %>%
+  as.data.frame() %>%
+  mutate(type = "model",
+         timestep = 1:n())
+
+# create a single data frame for plotting
+transitivities <- bind_rows(trans_real, trans_model) %>%
+  rename("transitivity" = ".")
+```
+
+Plot transitivities:
+
+```{r}
+transitivities %>%
+  ggplot(aes(x = timestep, y = transitivity, col = type))+
+  geom_smooth()+
+  theme_minimal()
+```
+
+Oh, this is fascinating. Okay so the modeled graphs are denser than the real ones but have lower transitivity. [Transitivity](https://igraph.org/r/doc/transitivity.html) is the "probability that the adjacent vertices of a vertex are connected. This is sometimes also called the clustering coefficient." This is highly relevant to the question of rewiring, and it's also very relevant to understanding the biology of the species.
+
+So at this point, we have a working hypothesis that the reason for these different structures is that individuals feed infrequently and in groups. (I'm not sure if that hypothesis explains the transitivity thing, though. Maybe the move is to have them prefer certain other individuals/friends?)
+
+If this hypothesis is correct, then the next questions to ask are:
+1) how often does each vulture feed, in the model vs. in real life?
+2) how often does each vulture go without feeding at a stretch?
+3) how similar are the clusters of individuals feeding together on any given day? I wonder if we have overlapping sets of individuals, e.g. even and odd days.
+4) what else?
+
+
+### Make animations of the networks to compare them:
+
+```{r}
+coords <- data.frame(name = names(igraph::V(realGraphs[[1]])),
+                     x = rnorm(n = length(V(realGraphs[[1]]))),
+                     y = rnorm(n = length(V(realGraphs[[1]]))))
+```
+
+
+```{r fig.show='animate', ffmpeg.format='gif', dev='jpeg'}
+for (i in 1:10) plot(runif(100), ylim = c(0, 1)) # for example
+```
+```
+
+```{r}
+tidygraph::as_tbl_graph(test, nodes = igraph::V(test)) %>%
+  ggraph(layout = "manual", x = coords$x, y = coords$y)+
+  geom_edge_link()+
+  geom_node_point(size = 4, aes(col = name))+
+  theme_graph()+
+  theme(legend.position = "none")+
+  scale_color_viridis_d()
+```
+
+
 
