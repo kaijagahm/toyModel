@@ -99,4 +99,9 @@ southern <- indivs %>%
 southernEdges2021 <- feedingEdges2021 %>%
   dplyr::filter(ID1 %in% southern & ID2 %in% southern)
 
+# restrict the points to only southern individuals
+southernPoints2021 <- feedingPoints2021 %>%
+  dplyr::filter(trackId %in% southern)
+
 save(southernEdges2021, file = "data/southernEdges2021.Rda")
+save(southernPoints2021, file = "data/southernPoints2021")
