@@ -15,6 +15,8 @@ Get the model function, and also load the real life data.
 
 ```{r warning = FALSE, message = FALSE}
 library(tidyverse)
+library(gifski)
+library(ggraph)
 source("modelFunction_rewiring.R")
 load("data/southernEdges2021.Rda")
 ```
@@ -215,25 +217,39 @@ If this hypothesis is correct, then the next questions to ask are:
 
 ```{r}
 coords <- data.frame(name = names(igraph::V(realGraphs[[1]])),
-                     x = rnorm(n = length(V(realGraphs[[1]]))),
-                     y = rnorm(n = length(V(realGraphs[[1]]))))
+                     x = rnorm(n = length(igraph::V(realGraphs[[1]]))),
+                     y = rnorm(n = length(igraph::V(realGraphs[[1]]))))
 ```
 
 
-```{r fig.show='animate', ffmpeg.format='gif', dev='jpeg'}
-for (i in 1:10) plot(runif(100), ylim = c(0, 1)) # for example
-```
+```{r, animation.hook="gifski", dev='png', interval = 0.2, echo = FALSE}
+for(i in 1:length(realGraphs)){
+  p <- tidygraph::as_tbl_graph(realGraphs[[i]], nodes = coords$name) %>%
+    ggraph(layout = "manual", x = coords$x, y = coords$y)+
+    geom_edge_link()+
+    geom_node_point(size = 4, aes(col = name))+
+    theme_graph()+
+    scale_color_viridis_d()+
+    theme(legend.position = "none")+
+    ggtitle("real networks")
+  print(p)
+}
 ```
 
-```{r}
-tidygraph::as_tbl_graph(test, nodes = igraph::V(test)) %>%
-  ggraph(layout = "manual", x = coords$x, y = coords$y)+
-  geom_edge_link()+
-  geom_node_point(size = 4, aes(col = name))+
-  theme_graph()+
-  theme(legend.position = "none")+
-  scale_color_viridis_d()
+```{r, animation.hook="gifski", dev='png', interval = 0.2, echo = FALSE}
+for(i in 1:length(modelGraphs)){
+  p <- tidygraph::as_tbl_graph(modelGraphs[[i]], nodes = coords$name) %>%
+    ggraph(layout = "manual", x = coords$x, y = coords$y)+
+    geom_edge_link()+
+    geom_node_point(size = 4, aes(col = coords$name))+
+    theme_graph()+
+    scale_color_viridis_d()+
+    theme(legend.position = "none")+
+    ggtitle("model networks")
+  print(p)
+}
 ```
+
 
 
 
