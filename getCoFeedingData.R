@@ -27,13 +27,10 @@ MB.LoginObject=movebankLogin(username='kaijagahm',password=pw)
 rm(pw)
 
 # Get the 2021 data and save it XXX will need to make this a separate script.
-# data2021 <- vultureUtils::downloadVultures(loginObject = MB.LoginObject, extraSensors = F, removeDup = T, dateTimeStartUTC = as.POSIXct("2021-01-01 00:00"), dateTimeEndUTC = as.POSIXct("2021-12-31 11:59"))
-#testData2021 <- vultureUtils::downloadVultures(loginObject = MB.LoginObject, extraSensors = F, removeDup = T, dateTimeStartUTC = as.POSIXct("2021-01-01 00:00"), dateTimeEndUTC = as.POSIXct("2021-03-30 11:59"))
-#save(testData2021, file = "data/testData2021.Rda")
+data2021 <- vultureUtils::downloadVultures(loginObject = MB.LoginObject, extraSensors = F, removeDup = T, dateTimeStartUTC = as.POSIXct("2020-01-01 00:00"), dateTimeEndUTC = as.POSIXct("2022-04-30 11:59"))
 # save to data/ folder as a .Rda
-# save(data2021, file = "data/data2021.Rda")
+save(data2021, file = "data/data2021.Rda")
 # Load the pre-downloaded 2021 data
-#load("data/testData2021.Rda")
 load("data/data2021.Rda")
 
 # convert to a data frame
@@ -104,4 +101,4 @@ southernPoints2021 <- feedingPoints2021 %>%
   dplyr::filter(trackId %in% southern)
 
 save(southernEdges2021, file = "data/southernEdges2021.Rda")
-save(southernPoints2021, file = "data/southernPoints2021")
+save(southernPoints2021, file = "data/southernPoints2021.Rda")
