@@ -20,12 +20,95 @@ library(igraph)
 library(fitdistrplus)
 
 # load data
-load("data/feedingEdges2021.Rda") # derived from getCoFeedingData_2021.R
-load("data/feedingPoints2021.Rda") # derived from getCoFeedingData_2021.R
-load("data/southernEdges2021.Rda") # derived from getCoFeedingData_2021.R
+load("data/southernEdges_20200101_20220430.Rda") # derived from getCoFeedingData.R
+load("data/southernPoints_20200101_20220430.Rda") # derived from getCoFeedingData.R
 ```
 
 Now I'm going to use these data to create networks and do some calculations, in order to parameterize the model.
+
+## Examine individuals' presence throughout the data
+
+```{r}
+fivedays <- vultureUtils::makeGraphs(edges = southernEdges_20200101_20220430, interval = "5 days", 
+                                     dateTimeStart = "2020-01-01 00:00:00",
+                                     dateTimeEnd = "2022-04-30 11:59:00",
+                                     weighted = FALSE, allVertices = TRUE)$graphs
+# Using the 5-day interval graph
+fivedays_reduced <- lapply(fivedays, function(x){
+  delete.vertices(x, degree(x) < 1)
+})
+
+dates <- names(fivedays_reduced)
+verts <- map2(.x = fivedays_reduced, .y = dates, .f = function(.x, .y){
+  names(igraph::V(.x)) %>%
+    as.data.frame() %>%
+    mutate(earlyDate = lubridate::ymd(.y)) %>%
+    rename("trackId" = ".")
+})
+allVerts <- data.table::rbindlist(verts) %>%
+  as.data.frame()
+
+# Are there any individuals that disappeared before the end of the study or appeared late?
+minmax <- southernPoints_20200101_20220430 %>%
+  dplyr::filter(trackId %in% allVerts$trackId) %>%
+  sf::st_drop_geometry() %>%
+  dplyr::select(trackId, timestamp) %>%
+  group_by(trackId) %>%
+  summarize(minTime = min(timestamp),
+            maxTime = max(timestamp))
+
+# Do we have individuals that stopped being tracked partway through the year, or that didn't start being tracked until later?
+minmax %>% 
+  ggplot(aes(x = minTime))+
+  geom_histogram() # huh, looks like a lot of individuals didn't start being tracked until October. I guess a lot of tagging happened then. I wonder if I need to adjust the time window.
+
+minmax %>%
+  ggplot(aes(x = maxTime))+
+  geom_histogram() # a few stopped early but not many.
+
+# Let's view a full time graph of each individual.
+head(southernPoints_20200101_20220430)
+timeseries <- southernPoints_20200101_20220430 %>%
+  sf::st_drop_geometry() %>%
+  dplyr::select(trackId, dateOnly) %>%
+  dplyr::distinct()
+
+# get order, and plot
+order <- timeseries %>%
+  group_by(trackId) %>%
+  summarize(n = n()) %>%
+  arrange(n) %>%
+  pull(trackId)
+
+timeseries %>%
+  mutate(trackId = factor(trackId, levels = order)) %>%
+  ggplot(aes(x = dateOnly, y = trackId))+
+  geom_point(size = 1)
+
+# See what it looks like if we restrict the dates to 2020-01-01 through 2021-09-01
+startDate <- "2020-01-01"
+endDate <- "2021-09-01"
+timeseries %>%
+  filter(dateOnly > lubridate::ymd(startDate) & dateOnly < lubridate::ymd(endDate)) %>%
+  mutate(trackId = factor(trackId, levels = order)) %>%
+  ggplot(aes(x = dateOnly, y = trackId))+
+  geom_point(size = 1)
+
+# Now remove a few individuals not observed both before and after February 2021
+toKeep <- timeseries %>%
+  group_by(trackId) %>%
+  summarize(min = min(dateOnly),
+         max = max(dateOnly)) %>%
+  filter(min < lubridate::ymd("2021-02-01") & max > lubridate::ymd("2021-02-01")) %>%
+  pull(trackId)
+
+# Get usable edges, removing the individuals that don't fall within those constraints, and removing bad dates.
+toUse <- southernEdges_20200101_20220430 %>%
+  filter(ID1 %in% toKeep | ID2 %in% toKeep,
+         minTimestamp > lubridate::ymd(startDate),
+         maxTimestamp < lubridate::ymd(endDate))
+save(toUse, file = "data/toUse.Rda")
+```
 
 Going to do a sensitivity analysis over various increments, ranging from 1 to 31 days.
 
@@ -43,10 +126,10 @@ interval <- paste(interval.num, "days")
 histdfs <- vector(mode = "list", length = length(interval))
 
 for(i in 1:length(interval)){
-  graphs <- vultureUtils::makeGraphs(edges = southernEdges2021, interval = interval[i], 
-                       dateTimeStart = "2021-01-01 00:00:00",
-                       dateTimeEnd = "2021-12-31 11:59:00",
-                       weighted = FALSE, allVertices = TRUE)$graphs
+  graphs <- vultureUtils::makeGraphs(edges = toUse, interval = interval[i], 
+                                     dateTimeStart = "2020-01-01 00:00:00",
+                                     dateTimeEnd = "2021-09-01 11:59:00",
+                                     weighted = FALSE, allVertices = TRUE)$graphs
   probs <- vultureUtils::computeProbs(graphs)
   histdfs[[i]] <- probs
 }
@@ -75,7 +158,7 @@ sensData %>%
   scale_color_viridis_d()
 ```
 
-Okay, cool. We don't see a ton of difference between the different time windows, but in general the 1- and 6-day intervals seem to look a bit more distinct. Leaning toward going with those anyway, but let's also take a look at these probabilities over time.
+Okay, cool. We don't see a ton of difference between the different time windows, but in general the 1- and 5-day intervals seem to look a bit more distinct. Leaning toward going with those anyway, but let's also take a look at these probabilities over time.
 
 ```{r}
 sensData %>%
@@ -97,10 +180,10 @@ Now, let's take a look at how the network density changes over time. This will b
 ```{r}
 # Now let's take a look at the network densities and see how they change.
 intervalGraphs <- lapply(interval, function(x){
-  graphs <- vultureUtils::makeGraphs(edges = southernEdges2021, interval = x, 
-                       dateTimeStart = "2021-01-01 00:00:00",
-                       dateTimeEnd = "2021-12-31 11:59:00",
-                       weighted = FALSE, allVertices = TRUE)$graphs
+  graphs <- vultureUtils::makeGraphs(edges = toUse, interval = x, 
+                                     dateTimeStart = "2020-01-01 00:00:00",
+                                     dateTimeEnd = "2022-09-01 11:59:00",
+                                     weighted = FALSE, allVertices = TRUE)$graphs
   
 })
 
@@ -136,7 +219,7 @@ densities %>%
   facet_wrap(~interval)
 ```
 
-This graph is a bit hard to interpret. But in general, it looks like the pattern gets a lot noisier as the time window gets bigger, which is kind of interesting and counter-intuitive. I want the graph density to remain roughly constant, so I'm going to look at choosing one of the shorter time windows. I'm more inclined to go with 5 days (or 5, for simplicity) rather than 1 day. 
+In general, it looks like the pattern gets a lot noisier as the time window gets bigger, which is kind of interesting and counter-intuitive. I want the graph density to remain roughly constant, so I'm going to look at choosing one of the shorter time windows. I'm more inclined to go with 5 days (or 5, for simplicity) rather than 1 day. 
 
 Let's look at the distribution of densities for 1 day and 5 days.
 
@@ -158,23 +241,19 @@ When we have a 1-day time window, the reason the density is so consistent is tha
 Calculate some parameter values to use in the model:
 
 ```{r}
-# Get the mean network density for 1 day and 6 days
-density_1day <- densities %>%
-  filter(interval == "1 days") %>%
-  pull(density) %>%
-  mean()
-
+# Get the mean network density for 5 days
+int <- "5 days"
 density_5day <- densities %>%
-  filter(interval == "5 days") %>%
+  filter(interval == int) %>%
   pull(density) %>%
   mean()
 
 # Get beta distributions to fit each of the probabilities.
 probs <- sensData %>%
   dplyr::filter(!is.nan(prob),
-         !is.na(prob)) %>%
+                !is.na(prob)) %>%
   dplyr::mutate(prob = (prob - min(prob) + 0.001) / (max(prob) - min(prob) + 0.002)) %>%
-  dplyr::filter(interval == "5 days")
+  dplyr::filter(interval == int)
 
 fit_add00 <- fitdist(probs %>% 
                        filter(type == "add00") %>% 
@@ -203,9 +282,16 @@ plot(fit_lose01, las = 1)
 plot(fit_lose11, las = 1)
 ```
 
-Looks like the beta distribution is a good fit for `add00` and `lose11`, but not a good fit for the other two. I guess we'll just use uniform for the other two.
+I guess I'll use these beta distributions... Let's save them as a list.
 
-For 5-day intervals, the beta distribution parameters for `add00` are `r fit_add00$estimate[1]` and `r fit_add00$estimate[2]`. The beta distribution parameters for `add10` are `r fit_add10$estimate[1]` and `r fit_add10$estimate[2]`.
+```{r}
+betaDistributions <- list("add00" = fit_add00$estimate,
+                          "add10" = fit_add10$estimate,
+                          "lose01" = fit_lose01$estimate,
+                          "lose11" = fit_lose11$estimate,
+                          "metadata" = paste("these are the beta distributions for `add` and `lose` model parameters, using an interval of", int, "over the date range", startDate, "to", endDate))
+save(betaDistributions, file = "data/betaDistributions.Rda")
+```
 
 The mean network density is `r density_5day`.
 
@@ -268,3 +354,127 @@ degreeData %>%
 ```
 
 Huh, even after removing the individuals with degree 0, we still have an incredibly right-skewed degree distribution.
+
+### How often do individuals feed?
+
+Here, I'm using the point data, not the edges data. This is *important* because the point data has not yet been through the process of aggregating it by timegroups and spatial groups. That means that I could, and probably will, end up with individuals that show up in the point data that won't actually have any edges in the corresponding timeslice in the final network, since they are feeding far away from other vultures.
+
+I debated whether I care about this. But I think for the purposes of the question I'm looking into here--"What is the underlying pattern of vultures' feeding schedules?"--it's actually correct to use the point data rather than the edge data.
+
+For the purposes of addressing the question as it pertains to the toy model, though, I think I will also want to do this gap analysis on the edge data and see if I get similar results.
+
+For each individual, does it participate in at least one connection in this time slice, yes or no?
+XXX need to go back to the original, un-aggregated feeding data. Find gaps in feeding dates, and look at the length of those gaps. for each individual, get mean and sd of length of gaps, and plot. Then get mean and sd of means.
+
+```{r}
+toUsePoints <- southernPoints_20200101_20220430 %>%
+  filter(trackId %in% toKeep,
+         dateOnly >= startDate & dateOnly <= endDate)
+
+datesObserved <- toUsePoints %>%
+  sf::st_drop_geometry() %>%
+  dplyr::select(trackId, dateOnly) %>%
+  distinct()
+
+# Compute gaps in feeding observations
+gaps <- datesObserved %>%
+  group_by(trackId) %>%
+  mutate(gap = dateOnly-lag(dateOnly))
+
+# Visualize the gaps by individual
+gaps %>%
+  ggplot(aes(x = as.numeric(gap), col = trackId))+
+  geom_density()+
+  theme(legend.position = "none")
+
+# Okay, so the gaps are extremely right skewed. 
+gapStats <- gaps %>%
+  group_by(trackId) %>%
+  summarize(mngap = as.numeric(mean(gap, na.rm = T)),
+            sdgap = as.numeric(sd(gap, na.rm = T)),
+            mingap = as.numeric(min(gap, na.rm = T)),
+            maxgap = as.numeric(max(gap, na.rm = T))) %>%
+  pivot_longer(cols = -trackId, names_to = "stat", values_to = "value")
+
+# Make distributions
+gapStats %>%
+  ggplot(aes(x = value))+
+  geom_density()+
+  facet_wrap(~stat, scales = "free")
+
+mnmn <- gapStats %>%
+  filter(stat == "mngap") %>%
+  pull(value) %>%
+  mean()
+
+mnsd <- gapStats %>%
+  filter(stat == "sdgap") %>%
+  pull(value) %>%
+  mean()
+```
+
+The distributions of how often individuals feed are extremely right-skewed--maybe negative exponential? On average, individuals feed every `r mnmn` days, but the mean standard deviation is `r mnsd` days. Some individuals go much longer times between feeding events, though I suspect that that has more to do with when they're present in the data.
+
+I guess in order to really suss this out, we'd have to compare their presence in the feeding dataset to their presence in the overall dataset. Heeeeeere we go.
+
+```{r}
+# Load all the data (i.e. not just Israel, not just feeding points)
+load("data/data_20200101_20220430.Rda")
+allDat <- as.data.frame(data_20200101_20220430)
+
+# Filter it to only include the dates and individuals we want
+allDat <- allDat %>%
+  filter(trackId %in% toKeep,
+         timestamp >= startDate & timestamp <= endDate)
+
+# Restrict it to just Israel (no need to do the other step to restrict to mostly-Israel individuals, since we already narrowed it down to the individuals contained in feedingPoints_20200101_20220430)
+maskIsrael <- sf::st_read("data/maskIsrael.kml")
+
+allDat_masked <- vultureUtils::maskData(dataset = allDat, mask = maskIsrael, longCol = "location_long.1", latCol = "location_lat.1", crs = "WGS84")
+
+dim(allDat_masked) # okay looks good
+
+# Now, let's compute gaps in PRESENCE in the data (i.e. not only in the feeding data.) Then we can compare this to presence in the feeding data.
+allDat_masked_presence <- allDat_masked %>%
+  sf::st_drop_geometry() %>%
+  mutate(dateOnly = lubridate::date(timestamp)) %>%
+  dplyr::select(trackId, dateOnly) %>%
+  distinct()
+  
+# Now do the comparison. First, rename the variables so it's a little clearer what's going on here.
+feedingDates <- datesObserved %>%
+  rename("date" = dateOnly) %>%
+  mutate(type = "feeding")
+
+overallDates <- allDat_masked_presence %>%
+  rename("date" = dateOnly) %>%
+  mutate(type = "overall")
+
+dates <- bind_rows(feedingDates, overallDates) %>%
+  mutate(present = TRUE) %>%
+  pivot_wider(id_cols = c("trackId", "date"), names_from = "type", values_from = "present", values_fill = FALSE)
+
+# On what proportion of the dates when a bird was observed did it not feed?
+prop <- dates %>%
+  group_by(trackId) %>%
+  summarize(propDatesFeeding = sum(feeding)/sum(overall))
+
+prop %>% 
+  ggplot(aes(x = propDatesFeeding))+
+  geom_density()+
+  theme_minimal()
+
+# okay, this is helpful! They feed most of the days that they're observed.
+```
+Next:
+1) characterize the gap lengths between feeding events, after controlling for which dates they were observed.
+
+```{r}
+head(dates)
+dates %>%
+  group_by(trackId) %>%
+  arrange(trackId, date) %>%
+  mutate(rle = cumsum(feeding))
+```
+
+2) during which proportion of dates when they fed did they *interact* while feeding? Should think of this as a three-tiered hierarchy.
