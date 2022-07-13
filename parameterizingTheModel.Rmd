@@ -29,10 +29,10 @@ Now I'm going to use these data to create networks and do some calculations, in 
 ## Examine individuals' presence throughout the data
 
 ```{r}
-fivedays <- vultureUtils::makeGraphs(edges = southernEdges_20200101_20220430, interval = "5 days", 
-                                     dateTimeStart = "2020-01-01 00:00:00",
-                                     dateTimeEnd = "2022-04-30 11:59:00",
-                                     weighted = FALSE, allVertices = TRUE)$graphs
+fivedays <- makeGraphs(edges = southernEdges_20200101_20220430, interval = "5 days", 
+                       dateTimeStart = "2020-01-01 00:00:00",
+                       dateTimeEnd = "2022-04-30 11:59:00",
+                       weighted = FALSE, allVertices = TRUE)$graphs
 # Using the 5-day interval graph
 fivedays_reduced <- lapply(fivedays, function(x){
   delete.vertices(x, degree(x) < 1)
@@ -85,8 +85,8 @@ timeseries %>%
   ggplot(aes(x = dateOnly, y = trackId))+
   geom_point(size = 1)
 
-# See what it looks like if we restrict the dates to 2020-01-01 through 2021-09-01
-startDate <- "2020-01-01"
+# See what it looks like if we restrict the dates to 2020-10-01 through 2021-09-01
+startDate <- "2020-10-01"
 endDate <- "2021-09-01"
 timeseries %>%
   filter(dateOnly > lubridate::ymd(startDate) & dateOnly < lubridate::ymd(endDate)) %>%
@@ -98,7 +98,7 @@ timeseries %>%
 toKeep <- timeseries %>%
   group_by(trackId) %>%
   summarize(min = min(dateOnly),
-         max = max(dateOnly)) %>%
+            max = max(dateOnly)) %>%
   filter(min < lubridate::ymd("2021-02-01") & max > lubridate::ymd("2021-02-01")) %>%
   pull(trackId)
 
@@ -126,10 +126,10 @@ interval <- paste(interval.num, "days")
 histdfs <- vector(mode = "list", length = length(interval))
 
 for(i in 1:length(interval)){
-  graphs <- vultureUtils::makeGraphs(edges = toUse, interval = interval[i], 
-                                     dateTimeStart = "2020-01-01 00:00:00",
-                                     dateTimeEnd = "2021-09-01 11:59:00",
-                                     weighted = FALSE, allVertices = TRUE)$graphs
+  graphs <- makeGraphs(edges = toUse, interval = interval[i], 
+                       dateTimeStart = "2020-01-01 00:00:00",
+                       dateTimeEnd = "2021-09-01 11:59:00",
+                       weighted = FALSE, allVertices = TRUE)$graphs
   probs <- vultureUtils::computeProbs(graphs)
   histdfs[[i]] <- probs
 }
@@ -156,6 +156,13 @@ sensData %>%
   facet_wrap(~type)+
   theme_minimal()+
   scale_color_viridis_d()
+
+sensData %>%
+  filter(interval == "5 days") %>%
+  ggplot(aes(x = prob))+
+  geom_density(size = 1)+
+  facet_wrap(~type)+
+  theme_minimal()
 ```
 
 Okay, cool. We don't see a ton of difference between the different time windows, but in general the 1- and 5-day intervals seem to look a bit more distinct. Leaning toward going with those anyway, but let's also take a look at these probabilities over time.
@@ -180,10 +187,10 @@ Now, let's take a look at how the network density changes over time. This will b
 ```{r}
 # Now let's take a look at the network densities and see how they change.
 intervalGraphs <- lapply(interval, function(x){
-  graphs <- vultureUtils::makeGraphs(edges = toUse, interval = x, 
-                                     dateTimeStart = "2020-01-01 00:00:00",
-                                     dateTimeEnd = "2022-09-01 11:59:00",
-                                     weighted = FALSE, allVertices = TRUE)$graphs
+  graphs <- makeGraphs(edges = toUse, interval = x, 
+                       dateTimeStart = "2020-10-01 00:00:00",
+                       dateTimeEnd = "2021-09-01 11:59:00",
+                       weighted = FALSE, allVertices = TRUE)$graphs
   
 })
 
@@ -280,6 +287,65 @@ plot(fit_add00, las = 1)
 plot(fit_add10, las = 1)
 plot(fit_lose01, las = 1)
 plot(fit_lose11, las = 1)
+
+# Plot the density curves with the beta distributions over them
+add00Plot <- sensData %>%
+  filter(interval == "5 days",
+         type == "add00") %>%
+  ggplot(aes(x = prob))+
+  geom_histogram(fill = "lightgrey", col = "darkgrey")+
+  theme_minimal()+
+  ylab("")+
+  xlab("")+
+  stat_function(fun = function(x) dbeta(x, fit_add00$estimate[1], fit_add00$estimate[2]), 
+                color = "blue",
+                size = 1)+
+  theme(axis.text.y.left = element_blank(),
+        axis.text.x = element_blank())
+
+add10Plot <- sensData %>%
+  filter(interval == "5 days",
+         type == "add10") %>%
+  ggplot(aes(x = prob))+
+  geom_histogram(fill = "lightgrey", col = "darkgrey")+
+  theme_minimal()+
+  ylab("")+
+  xlab("")+
+  stat_function(fun = function(x) dbeta(x, fit_add10$estimate[1], fit_add10$estimate[2]), 
+                color = "blue",
+                size = 1)+
+  theme(axis.text.y.left = element_blank(),
+        axis.text.x = element_blank())
+
+lose11Plot <- sensData %>%
+  filter(interval == "5 days",
+         type == "lose11") %>%
+  ggplot(aes(x = prob))+
+  geom_histogram(fill = "lightgrey", col = "darkgrey")+
+  theme_minimal()+
+  ylab("")+
+  xlab("")+
+  stat_function(fun = function(x) dbeta(x, fit_lose11$estimate[1], fit_lose11$estimate[2]), 
+                color = "blue",
+                size = 1)+
+  theme(axis.text.y.left = element_blank(),
+        axis.text.x = element_blank())
+
+lose01Plot <- sensData %>%
+  filter(interval == "5 days",
+         type == "lose01") %>%
+  ggplot(aes(x = prob))+
+  geom_histogram(fill = "lightgrey", col = "darkgrey")+
+  theme_minimal()+
+  ylab("")+
+  xlab("")+
+  stat_function(fun = function(x) dbeta(x, fit_lose01$estimate[1], fit_lose01$estimate[2]), 
+                color = "blue",
+                size = 1)+
+  theme(axis.text.y.left = element_blank(),
+        axis.text.x = element_blank())
+
+grid <- cowplot::plot_grid(add00Plot, add10Plot, lose01Plot, lose11Plot, nrow = 1, ncol = 4)
 ```
 
 I guess I'll use these beta distributions... Let's save them as a list.
@@ -354,6 +420,366 @@ degreeData %>%
 ```
 
 Huh, even after removing the individuals with degree 0, we still have an incredibly right-skewed degree distribution.
+
+### What happens when individuals die?
+
+```{r}
+# For each individual, get nEdges and the end date
+indivsSummary <- toUse %>%
+  mutate(pair = paste(ID1, ID2)) %>%
+  pivot_longer(cols = c("ID1", "ID2"), values_to = "trackId") %>% # pivot to long so we can sort by individual, but still only listing the edges in one direction.
+  group_by(trackId) %>%
+  summarize(nEdges = n(),
+            firstDate = min(lubridate::date(minTimestamp), na.rm = FALSE),
+            lastDate = max(lubridate::date(maxTimestamp), na.rm = FALSE))
+
+# Plot the durations as segments
+timeline <- indivsSummary %>%
+  ggplot()+
+  geom_segment(aes(x = firstDate, xend = lastDate, y = trackId, yend = trackId))+
+  geom_point(aes(x = firstDate, y = trackId), color = "skyblue", size=2 )+
+  geom_point(aes(x = lastDate, y = trackId), color = "firebrick", size=2 )+
+  theme_minimal()+
+  xlab("Date")+
+  ylab("Vulture")+
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        axis.title.y = element_text(size = 18, face = "bold"),
+        axis.title.x = element_text(size = 18, face = "bold"),
+        axis.text.x = element_text(size = 16))
+
+timeline
+```
+
+```{r}
+# Do those end dates cluster together, or are they kind of isolated?
+# Well, most of the individuals end at the end, but we do have several that are removed early. 
+# To complicate the picture, this dataset includes a few individuals (J321, J30w, and J16w) that enter the population quite late (e.g. May 2021). Then we also have a couple of individuals that are removed around that time (including one of the tagged juvs.)
+# I'm going to focus on the 5 removals that happen before those additions. We have T85w, J36w, A09w, A04w, and A76w, in that order. For each of these, let's look at what happens when they get removed.
+removedIndivs <- indivsSummary %>%
+  filter(trackId %in% c("T85w", "J36w", "A09w", "A04w", "A76w", "A13w", "T77w"))
+
+# For each removed individual, let's look at the last time slice where they participated in an edge and the first one in which they're not. Then I'm going to extract the 1 previous and 1 following time slices for each of those individuals.
+earlyDates <- lubridate::ymd(names(fivedays_reduced)) # looking at reduced networks to only include nodes involved in edges.
+networkSubsets <- vector(mode = "list", length = nrow(removedIndivs))
+
+# Limit fivedays_reduced to the date range we're considering
+minslice <- max(which(as.Date(names(fivedays_reduced)) < as.Date("2020-10-01")))
+maxslice <- min(which(as.Date(names(fivedays_reduced)) > as.Date("2021-09-01")))
+fivedays_reduced_touse <- fivedays_reduced[minslice:maxslice]
+fivedays_touse <- fivedays[minslice:maxslice] # do the same with fivedays so we can use it too.
+
+for(i in 1:length(networkSubsets)){
+  removed <- removedIndivs$trackId[i]
+  
+  lastSlice <- lapply(fivedays_reduced_touse, function(x){
+    removed %in% names(V(x))
+  }) %>%
+    unlist() %>%
+    which() %>%
+    max()
+  
+  networkSubsets[[i]] <- fivedays_touse[(lastSlice-1):(lastSlice+1)] # subsetting from fivedays, not fivedays_reduced, here, because we want to have all the vertices.
+}
+```
+
+```{r}
+# Function definition
+# Following the model calculations, look at history of bereaved edges and see what kind of rewiring occurs when the individual is lost (Maybe make some animations just looking at that individual and its near affiliates, or individuals that are destined to become its near affiliates?)
+examineLoss <- function(dat, removed){
+  whichRemoved <- which(names(V(dat[[1]])) == removed)
+  
+  # Convert networks to adjacency matrices
+  adjMatrices <- lapply(dat, function(x){
+    igraph::get.adjacency(x) %>%
+      as.matrix()
+  })
+  
+  # Get names of bereaved and non-bereaved nodes
+  edges <- adjMatrices[[1]][whichRemoved,]
+  bereaved <- names(which(edges == 1))
+  non.bereaved <- names(which(edges == 0))
+  
+  # Make an edge list
+  el <- expand.grid(names(edges), names(edges)) %>%
+    mutate(across(.cols = c(Var1, Var2), as.character)) %>%
+    filter(Var1 != removed,
+           Var2 != removed) %>%
+    mutate(prev = ifelse(get.edge.ids(graph = dat[[1]], vp = c(Var1, Var2), directed = FALSE) > 0, 1, 0),
+           cur = ifelse(get.edge.ids(graph = dat[[2]], vp = c(Var1, Var2), directed = FALSE) > 0, 1, 0),
+           after = ifelse(get.edge.ids(graph = dat[[3]], vp = c(Var1, Var2), directed = FALSE) > 0, 1, 0),
+           category = case_when(Var1 %in% bereaved & Var2 %in% bereaved ~ "bb",
+                                (Var1 %in% bereaved & Var2 %in% non.bereaved) | 
+                                  (Var2 %in% bereaved & Var1 %in% non.bereaved) ~ "bn",
+                                Var1 %in% non.bereaved & Var2 %in% non.bereaved ~ "nn",
+                                TRUE ~ NA_character_))
+  
+  # Are bb edges more likely to form than nb or nn edges?
+  pForm <- el %>%
+    filter(cur == 0) %>%
+    group_by(category) %>%
+    summarize(nPotential = n(),
+              nFormed = sum(after == 1),
+              pForm = nFormed/nPotential)
+  
+  # Are bb edges less likely to disappear than nb or nn edges?
+  pDisappear <- el %>%
+    filter(cur == 1) %>%
+    group_by(category) %>%
+    summarize(n = n(),
+              nDisappeared = sum(after == 0),
+              pDisappear = nDisappeared/n)
+  
+  # Are bb edges with a history more likely to form than bb edges without a history?
+  pFormHistory <- el %>%
+    filter(cur == 0) %>%
+    group_by(category, prev) %>%
+    summarize(nPotential = n(),
+              nFormed = sum(after == 1),
+              pForm = nFormed/nPotential)
+  
+  # Are bb edges with a history less likely to be lost than bb edges without a history?
+  pDisappearHistory <- el %>%
+    filter(cur == 1) %>%
+    group_by(category, prev) %>%
+    summarize(nPotential = n(),
+              nDisappeared = sum(after == 0),
+              pDisappear = nDisappeared/nPotential)
+  
+  return(list("pForm" = pForm, "pDisappear" = pDisappear, "pFormHistory" = pFormHistory, "pDisappearHistory"= pDisappearHistory, "el" = el))
+}
+```
+
+Use the function on the data for the four losses:
+
+```{r}
+lossInfo_fivedays <- map2(.x = networkSubsets, .y = removedIndivs$trackId, .f = function(.x, .y){
+  examineLoss(dat = .x, removed = .y)
+})
+```
+
+What happens if we aggregate over longer time windows? Do we still see this pattern?
+
+```{r}
+# Let's do the same examination as above, but with a 9 day interval instead of a 5 day interval.
+ninedays <- intervalGraphs[[3]]
+ninedays_reduced <- lapply(ninedays, function(x){
+  delete.vertices(x, degree(x) < 1)
+})
+earlyDates <- lubridate::ymd(names(ninedays_reduced)) # looking at reduced networks to only include nodes involved in edges.
+networkSubsets <- vector(mode = "list", length = nrow(removedIndivs))
+for(i in 1:length(networkSubsets)){
+  removed <- removedIndivs$trackId[i]
+  
+  lastSlice <- lapply(ninedays_reduced, function(x){
+    removed %in% names(V(x))
+  }) %>%
+    unlist() %>%
+    which() %>%
+    max()
+  
+  networkSubsets[[i]] <- ninedays[(lastSlice-1):(lastSlice+1)] # subsetting from ninedays, not ninedays_reduced, here, because we want to have all the vertices.
+}
+```
+
+Use the function on the data for the four losses:
+
+```{r}
+lossInfo_ninedays <- map2(.x = networkSubsets, .y = removedIndivs$trackId, .f = function(.x, .y){
+  examineLoss(dat = .x, removed = .y)
+})
+```
+
+Let's go back and answer the questions from above:
+
+```{r five-day-graphs}
+# FIVE DAY AGGREGATION
+# Are bb edges more likely to form than nb or nn edges?
+pForms_5 <- lapply(lossInfo_fivedays, function(x) x$pForm) %>%
+  setNames(., nm = removedIndivs$trackId) %>%
+  data.table::rbindlist(idcol = "lostIndiv")
+
+pForms_5 %>%
+  mutate(category = case_when(category == "bb" ~ "both bereaved",
+                              category == "bn" ~ "one bereaved",
+                              category == "nn" ~ "neither bereaved")) %>%
+  mutate(category = factor(category, levels = c("both bereaved", "one bereaved", "neither bereaved"))) %>%
+  ggplot(aes(x = category, y = pForm, fill = category))+
+  geom_boxplot()+
+  theme_minimal()+
+  scale_fill_manual(values = c("red", "purple", "blue"))+
+  ylab("Probablility of forming an edge")+
+  xlab("Relationship of nodes to lost node")+
+  theme(legend.position = "none",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16, face = "bold"))
+
+# Are bb edges less likely to disappear than nb or nn edges?
+pDisappears_5 <- lapply(lossInfo_fivedays, function(x) x$pDisappear) %>%
+  setNames(., nm = removedIndivs$trackId) %>%
+  data.table::rbindlist(idcol = "lostIndiv")
+
+pDisappears_5 %>%
+  mutate(category = case_when(category == "bb" ~ "both bereaved",
+                              category == "bn" ~ "one bereaved",
+                              category == "nn" ~ "neither bereaved")) %>%
+  mutate(category = factor(category, levels = c("both bereaved", "one bereaved", "neither bereaved"))) %>%
+  ggplot(aes(x = category, y = pDisappear, fill = category))+
+  geom_boxplot()+
+  theme_minimal()+
+  scale_fill_manual(values = c("red", "purple", "blue"))+
+  ylab("Probablility of edge disappearing")+
+  xlab("Relationship of nodes to lost node")+
+  theme(legend.position = "none",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16, face = "bold"))
+
+# Does history make a difference to the likelihood of edges to form?
+pFormHistories_5 <- lapply(lossInfo_fivedays, function(x) x$pFormHistory) %>%
+  setNames(., nm = removedIndivs$trackId) %>%
+  data.table::rbindlist(idcol = "lostIndiv")
+
+pFormHistories_5 %>%
+  mutate(category = case_when(category == "bb" ~ "both bereaved",
+                              category == "bn" ~ "one bereaved",
+                              category == "nn" ~ "neither bereaved")) %>%
+  mutate(category = factor(category, levels = c("both bereaved", "one bereaved", "neither bereaved"))) %>%
+  mutate(prev = as.logical(prev)) %>%
+  ggplot(aes(x = prev, y = pForm))+
+  geom_boxplot(aes(fill = prev))+
+  facet_wrap(~category)+
+  theme_minimal()+
+  ylab("Probability of edge forming")+
+  xlab("Did individuals interact in the previous timestep?")+
+  theme(legend.position = "none",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16, face = "bold"))
+
+# Does history make a difference to the likelihood of edges to disappear?
+pDisappearHistories_5 <- lapply(lossInfo_fivedays, function(x) x$pDisappearHistory) %>%
+  setNames(., nm = removedIndivs$trackId) %>%
+  data.table::rbindlist(idcol = "lostIndiv")
+
+pDisappearHistories_5 %>%
+  mutate(category = case_when(category == "bb" ~ "both bereaved",
+                              category == "bn" ~ "one bereaved",
+                              category == "nn" ~ "neither bereaved")) %>%
+  mutate(category = factor(category, levels = c("both bereaved", "one bereaved", "neither bereaved"))) %>%
+  mutate(prev = as.logical(prev)) %>%
+  ggplot(aes(x = prev, y = pDisappear))+
+  geom_boxplot(aes(fill = prev))+
+  facet_wrap(~category)+
+  theme_minimal()+
+  ylab("Probability of edge disappearing")+
+  xlab("Did individuals interact in the previous timestep?")+
+  theme(legend.position = "none",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16, face = "bold"))
+```
+
+```{r nine-day-graphs}
+# NINE DAY AGGREGATION
+# Are bb edges more likely to form than nb or nn edges?
+pForms_9 <- lapply(lossInfo_ninedays, function(x) x$pForm) %>%
+  setNames(., nm = removedIndivs$trackId) %>%
+  data.table::rbindlist(idcol = "lostIndiv")
+
+formBereaved <- pForms_9 %>%
+  mutate(category = case_when(category == "bb" ~ "both",
+                              category == "bn" ~ "one",
+                              category == "nn" ~ "neither")) %>%
+  mutate(category = factor(category, levels = c("both", "one", "neither"))) %>%
+  ggplot(aes(x = category, y = pForm, fill = category))+
+  geom_boxplot()+
+  theme_minimal()+
+  scale_fill_manual(values = c("red", "purple", "blue"))+
+  ylab("P(add)")+
+  xlab("Bereaved")+
+  theme(legend.position = "none",
+        axis.text = element_text(size = 18),
+        axis.title = element_text(size = 20, face = "bold"))
+formBereaved
+
+# Are bb edges less likely to disappear than nb or nn edges?
+pDisappears_9 <- lapply(lossInfo_ninedays, function(x) x$pDisappear) %>%
+  setNames(., nm = removedIndivs$trackId) %>%
+  data.table::rbindlist(idcol = "lostIndiv")
+
+pDisappears_9 %>%
+  mutate(category = case_when(category == "bb" ~ "both bereaved",
+                              category == "bn" ~ "one bereaved",
+                              category == "nn" ~ "neither bereaved")) %>%
+  mutate(category = factor(category, levels = c("both bereaved", "one bereaved", "neither bereaved"))) %>%
+  ggplot(aes(x = category, y = pDisappear, fill = category))+
+  geom_boxplot()+
+  theme_minimal()+
+  scale_fill_manual(values = c("red", "purple", "blue"))+
+  ylab("P(lose)")+
+  xlab("Relationship of nodes to lost node")+
+  theme(legend.position = "none",
+        axis.text = element_text(size = 18),
+        axis.title = element_text(size = 20, face = "bold"))
+
+# Does history make a difference to the likelihood of edges to form?
+pFormHistories_9 <- lapply(lossInfo_ninedays, function(x) x$pFormHistory) %>%
+  setNames(., nm = removedIndivs$trackId) %>%
+  data.table::rbindlist(idcol = "lostIndiv")
+
+formHistory <- pFormHistories_9 %>%
+  mutate(category = case_when(category == "bb" ~ "both bereaved",
+                              category == "bn" ~ "one bereaved",
+                              category == "nn" ~ "neither bereaved")) %>%
+  mutate(category = factor(category, levels = c("both bereaved", "one bereaved", "neither bereaved"))) %>%
+  ggplot(aes(x = factor(prev), y = pForm))+
+  geom_boxplot(aes(fill = factor(prev)))+
+  scale_fill_manual(values = c("grey", "white"))+
+  facet_wrap(~category)+
+  theme_minimal()+
+  ylab("P(add)")+
+  xlab("Edge history")+
+  theme(legend.position = "none",
+        axis.text = element_text(size = 18),
+        axis.title = element_text(size = 20, face = "bold"),
+        strip.text.x = element_blank())
+formHistory
+
+# Does history make a difference to the likelihood of edges to disappear?
+pDisappearHistories_9 <- lapply(lossInfo_ninedays, function(x) x$pDisappearHistory) %>%
+  setNames(., nm = removedIndivs$trackId) %>%
+  data.table::rbindlist(idcol = "lostIndiv")
+
+pDisappearHistories_9 %>%
+  mutate(category = case_when(category == "bb" ~ "both bereaved",
+                              category == "bn" ~ "one bereaved",
+                              category == "nn" ~ "neither bereaved")) %>%
+  mutate(category = factor(category, levels = c("both bereaved", "one bereaved", "neither bereaved"))) %>%
+  mutate(prev = as.logical(prev)) %>%
+  ggplot(aes(x = prev, y = pDisappear))+
+  geom_boxplot(aes(fill = prev))+
+  scale_fill_manual(values = c("grey", "white"))+
+  facet_wrap(~category)+
+  theme_minimal()+
+  ylab("P(lose)")+
+  xlab("Did individuals interact in the previous timestep?")+
+  theme(legend.position = "none",
+        axis.text = element_text(size = 18),
+        axis.title = element_text(size = 20, face = "bold"),
+        strip.text.x = element_blank())
+
+g <- cowplot::plot_grid(formBereaved+
+                          scale_y_continuous(breaks = seq(0, 1, 0.1))+
+                          ylim(0, 1),
+                        formHistory +
+                          scale_y_continuous(breaks = seq(0, 1, 0.5))+
+                          ylim(0, 1)+
+                          theme(axis.text.y = element_blank(),
+                                    axis.ticks.y = element_blank(),
+                                    axis.title.y = element_blank()),
+                        ncol = 2)
+g
+```
+
+
 
 ### How often do individuals feed?
 
@@ -440,7 +866,7 @@ allDat_masked_presence <- allDat_masked %>%
   mutate(dateOnly = lubridate::date(timestamp)) %>%
   dplyr::select(trackId, dateOnly) %>%
   distinct()
-  
+
 # Now do the comparison. First, rename the variables so it's a little clearer what's going on here.
 feedingDates <- datesObserved %>%
   rename("date" = dateOnly) %>%
@@ -466,6 +892,7 @@ prop %>%
 
 # okay, this is helpful! They feed most of the days that they're observed.
 ```
+
 Next:
 1) characterize the gap lengths between feeding events, after controlling for which dates they were observed.
 

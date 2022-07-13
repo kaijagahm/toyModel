@@ -24,10 +24,10 @@ load("data/toUse.Rda")
 Make 5-day graphs from the real data:
 
 ```{r}
-realGraphs <- vultureUtils::makeGraphs(edges = toUse, interval = "5 days", 
-                       dateTimeStart = "2020-01-01 00:00:00",
-                       dateTimeEnd = "2021-09-01 11:59:00",
-                       weighted = FALSE, allVertices = TRUE)$graphs
+realGraphs <- makeGraphs(edges = toUse, interval = "5 days", 
+                         dateTimeStart = "2020-10-01 00:00:00",
+                         dateTimeEnd = "2021-09-01 11:59:00",
+                         weighted = FALSE, allVertices = TRUE)$graphs
 nIndivs <- length(igraph::V(realGraphs[[1]]))
 ```
 
@@ -106,13 +106,18 @@ Okay, these are more similar now, and the model isn't wildly off. But there's st
 Mean and variation in degree distribution over time:
 
 ```{r}
-degrees %>%
+degreePlot <- degrees %>%
   ggplot(aes(x = timestep, y = degree))+
   geom_point(alpha = 0.2) +
   geom_smooth()+
   facet_wrap(~type)+
   theme_minimal()+
-  theme(legend.position = "none")
+  theme(legend.position = "none")+
+  ylab("Degree")+
+  xlab("Timestep")+
+  theme(axis.text = element_text(size = 16),
+        axis.title = element_text(size = 18, face = "bold"),
+        strip.text.x = element_blank())
 ```
 
 Ah, once again, we have a lot more individuals with degree 0 in the real data than in the model. If we remove the individuals with degree 0, we get something a tad more reasonable:
@@ -279,5 +284,56 @@ for(i in 1:length(modelGraphs)){
 }
 ```
 
+## Model results
+
+```{r}
+# How long does it take for the density to recover after the loss of a node?
+reps <- vector(mode = "list", length = 100)
+for(i in 1:length(reps)){
+  graphs <- runModel(N = nIndivs, burn.in = length(realGraphs), doRemoval = TRUE, burn.out = length(realGraphs)) %>%
+  lapply(., function(x){
+    igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+  })
+  reps[[i]] <- graphs
+  cat(".")
+}
+
+densities <- lapply(reps, function(x){
+  lapply(x, igraph::edge_density) %>%
+    setNames(., NULL) %>%
+    unlist() %>%
+    as.data.frame() %>%
+    mutate(type = "model",
+           timestep = 1:n()) %>%
+    rename("density" = ".")
+}) %>%
+  data.table::rbindlist(idcol = "rep")
+
+transitivities <- lapply(reps, function(x){
+  lapply(x, igraph::transitivity) %>%
+    setNames(., NULL) %>%
+    unlist() %>%
+    as.data.frame() %>%
+    mutate(type = "model",
+           timestep = 1:n()) %>%
+    rename("transitivity" = ".")
+}) %>%
+  data.table::rbindlist(idcol = "rep")
+
+densities %>%
+  ggplot(aes(x = timestep, y = density, col = factor(rep)))+
+  geom_vline(xintercept = length(realGraphs))+
+  geom_smooth(se = FALSE)+
+  theme_minimal()+
+  theme(legend.position = "none")
+
+transitivities %>%
+  ggplot(aes(x = timestep, y = transitivity, col = factor(rep)))+
+  geom_vline(xintercept = length(realGraphs))+
+  geom_smooth(se = FALSE)+
+  theme_minimal()+
+  theme(legend.position = "none")
+
+```
 
 

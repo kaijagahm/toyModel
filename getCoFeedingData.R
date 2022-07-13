@@ -27,9 +27,9 @@ MB.LoginObject=movebankLogin(username='kaijagahm',password=pw)
 rm(pw)
 
 # Get the data and save it.
-data_20200101_20220430 <- vultureUtils::downloadVultures(loginObject = MB.LoginObject, extraSensors = F, removeDup = T, dateTimeStartUTC = as.POSIXct("2020-01-01 00:00"), dateTimeEndUTC = as.POSIXct("2022-04-30 11:59"))
+#data_20200101_20220430 <- vultureUtils::downloadVultures(loginObject = MB.LoginObject, extraSensors = F, removeDup = T, dateTimeStartUTC = as.POSIXct("2020-01-01 00:00"), dateTimeEndUTC = as.POSIXct("2022-04-30 11:59"))
 # save to data/ folder as a .Rda
-save(data_20200101_20220430, file = "data/data_20200101_20220430.Rda")
+#save(data_20200101_20220430, file = "data/data_20200101_20220430.Rda")
 # Load the pre-downloaded data
 load("data/data_20200101_20220430.Rda"); beepr::beep()
 
