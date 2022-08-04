@@ -59,13 +59,12 @@ filteredData <- vultureUtils::filterLocs(df = datDF, speedThreshUpper = 5)
 # Now mask again to remove the out-of-Israel points.
 cleanedIsrael <- vultureUtils::maskData(dataset = filteredData, mask = israelMask, longCol = "location_long.1", latCol = "location_lat.1", crs = "WGS84")
 
-# Import feeding site locations and buffer them
-feedingSites <- read.csv("data/FeedingSites_AllActiveSouthNorth.csv")
-feedingSites <- vultureUtils::bufferFeedingSites(feedingSites, crsToSet = "WGS84", crsToReturn = "WGS84")
-
 # Import roost polygons
 roostPolygons <- sf::st_read("data/AllRoostPolygons.kml", quiet = TRUE) %>%
   sf::st_transform("WGS84")
+
+# Buffer the roosts by the buffer distance
+# XXX do this
 
 # Exclude any points that fall within a roost polygon
 feedingPoints <- cleanedIsrael[lengths(sf::st_intersects(cleanedIsrael, roostPolygons)) == 0,]

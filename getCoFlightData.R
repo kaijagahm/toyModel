@@ -53,7 +53,7 @@ datDF <- datDF %>% # using datDF because we don't want to actually restrict it t
   filter(trackId %in% longEnoughIndivs)
 
 # Filter
-## by setting speedLower to 5, we are restricting this to flight interactions.
+## by setting speedThreshLower to 5, we are restricting this to flight interactions.
 filteredData <- filterLocs(df = datDF, speedThreshLower = 5)
 
 # Now mask again to remove the out-of-Israel points.
@@ -62,6 +62,9 @@ cleanedIsrael <- vultureUtils::maskData(dataset = filteredData, mask = israelMas
 # Import roost polygons
 roostPolygons <- sf::st_read("data/AllRoostPolygons.kml", quiet = TRUE) %>%
   sf::st_transform("WGS84")
+
+# Buffer the roosts by the buffer distance
+# XXX do this
 
 # Exclude any points that fall within a roost polygon
 flightPoints <- cleanedIsrael[lengths(sf::st_intersects(cleanedIsrael, roostPolygons)) == 0,]
