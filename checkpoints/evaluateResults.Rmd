@@ -17,8 +17,8 @@ Get the model function, and also load the real life data.
 library(tidyverse)
 library(gifski)
 library(ggraph)
-source("modelFunction_rewiring.R")
-load("data/toUse.Rda")
+library(here)
+source(here("modelFunction_rewiring.R"))
 ```
 
 Make 5-day graphs from the real data:
