@@ -108,13 +108,14 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
   }
   
   # First, capture the edges involving the removed individual
-  edges <- network[del, -del] # row ([del,]), excluding self col ([,-del])
+  edges <- network[del, ] # row ([del,]), excluding self col ([,-del])
+  edges[del] <- NA
   bereaved <- which(edges == 1) # nodes that were connected to the removed individual
   non.bereaved <- which(edges == 0)
 
-  # Remove the node
-  network <- network[-del,] # rows 
-  network <- network[,-del] # columns
+  # Remove the node (set row and column to NA)
+  network[del,] <- NA # rows 
+  network[,del] <- NA # columns
   N <- N-1 # update the population size.
   
   # Now update the network.
