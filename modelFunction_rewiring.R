@@ -3,7 +3,8 @@
 # AUTHOR: Kaija Gahm (kgahm@ucla.edu)
 # REVISION DATE: 2022-07-06 (added parameters derived in parameterizingTheModel.Rmd)
 
-source("supportingFunctions.R") # all the functions that will be used in the main model
+library(here)
+source(here("supportingFunctions.R")) # all the functions that will be used in the main model
 
 runModel <- function(N = 50, # Nodes in the network
                      nodes.removed = 1, # Nodes to remove
