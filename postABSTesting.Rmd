@@ -1,0 +1,48 @@
+---
+title: "Post-ABS Testing"
+author: "Kaija Gahm"
+date: '2022-08-09'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning = FALSE, message = FALSE}
+library(tidyverse)
+library(gifski)
+library(ggraph)
+library(here)
+source(here("modelFunction_rewiring.R"))
+```
+
+First, let's run a model with a 7-day time window, 30 individuals.
+
+```{r}
+modelGraphs <- runModel(N = 50, # Nodes in the network
+                     nodes.removed = 1, # Nodes to remove
+                     n.removed = 1, # How many to remove at a time
+                     edge.prob = 0.04, 
+                     burn.in = 50,
+                     burn.out = 50,
+                     pm = 0.3,
+                     ps = 0.1, 
+                     pa = 0.2,
+                     add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
+                     lose01 = 0.3, 
+                     add10 = 0.2,
+                     lose11 = c(0.3283134, 0.3062181), # beta distribution parameters derived from parameterizingTheModel.Rmd.
+                     histMultiplier = 1.2,
+                     doRemoval = TRUE) %>%
+  lapply(., function(x){
+    igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+  })
+```
+
+Compute degree for each of the model networks.
+```{r}
+degrees <- lapply(modelGraphs, function(x){igraph::degree(x)})
+degreesDF <- do.call(cbind, degrees) %>% as.data.frame() %>% setNames(., paste0("timeSlice", 1:length(degrees)))
+```
+
