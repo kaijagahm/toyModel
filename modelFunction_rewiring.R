@@ -53,21 +53,15 @@ runModel <- function(N = 50, # Nodes in the network
       rewired.del <- rewired.list$del # removed individuals. Used for amending history matrices in order to continue baseline dynamics moving forward
       
       # Continue baseline dynamics following removal
-      revised.history <- lapply(network.history, function(x){
-        x <- x[-rewired.del,]
-        x <- x[,-rewired.del]
-        return(x)
-      })
+      ## Set up a list: the old network history, the rewired network, and some placeholders for the burnout
+      history <- append(network.history, list(rewired.network))
+      history <- append(history, rep(NA, burn.out)) # add spots for the burn out
       
-      revised.history <- append(revised.history, 
-                                list(rewired.network))
-      revised.history <- append(revised.history, rep(NA, burn.out))
-      
-      for(i in (burn.in+2):length(revised.history)){
-        output <- update.network(ind = i, revised.history, add00 = add00, 
+      for(i in (burn.in+2):length(history)){
+        output <- update.network(ind = i, history, add00 = add00, 
                                  add10 = add10, lose01 = lose01, lose11 = lose11)
-        revised.history[[i]] <- output # update history
+        history[[i]] <- output # update history
       }
-      return(revised.history)
+      return(history)
     }
 }
