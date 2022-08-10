@@ -78,11 +78,17 @@ update.network <- function(ind, # starting index for the history list.
   rands <- matrix(runif(N*N, 0, 1), nrow = N) # select random numbers from here
   
   # Modify the new adjacency matrix (upper triangle only)
-  new[h00] <- ifelse(rands[h00] < rbeta(1, shape1 = add00[1], shape2 = add00[2]), 1, 0)
-  new[h11] <- ifelse(rands[h11] < rbeta(1, shape1 = lose11[1], shape2 = lose11[2]), 0, 1)
-  new[h01] <- ifelse(rands[h01] < runif(1), 0, 1) # using uniform probabilities for 
-  new[h10] <- ifelse(rands[h10] < runif(1), 1, 0)
-  
+  new[h00] <- rbinom(n = nrow(h00), size = 1, 
+                     prob = rbeta(n = nrow(h00), 
+                                  shape1 = add00[1], shape2 = add00[2]))
+  new[h11] <- rbinom(n = nrow(h11), size = 1,
+                     prob = rbeta(n = nrow(h11),
+                                  shape1 = lose11[1], shape2 = lose11[2]))
+  new[h01] <- rbinom(n = nrow(h01), size = 1,
+                     prob = lose01)
+  new[h10] <- rbinom(n = nrow(h10), size = 1,
+                     prob = add10)
+
   # Symmetrize the matrix
   new <- as.matrix(sna::symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
   
