@@ -14,6 +14,7 @@ library(tidyverse)
 library(gifski)
 library(ggraph)
 library(here)
+library(igraph)
 source(here("modelFunction_rewiring.R"))
 ```
 
@@ -40,9 +41,138 @@ modelGraphs <- runModel(N = 50, # Nodes in the network
   })
 ```
 
+1. How does variation in degree emerge in this model?
+
 Compute degree for each of the model networks.
 ```{r}
 degrees <- lapply(modelGraphs, function(x){igraph::degree(x)})
-degreesDF <- do.call(cbind, degrees) %>% as.data.frame() %>% setNames(., paste0("timeSlice", 1:length(degrees)))
+degreesDF <- do.call(cbind, degrees) %>% as.data.frame() %>% setNames(., 1:length(degrees)) %>% mutate(individual = 1:nrow(.)) %>%
+  pivot_longer(cols = -individual, names_to = "slice", values_to = "degree") %>%
+  mutate(slice = as.numeric(slice)) %>%
+  mutate(beforeAfter = ifelse(slice <= 50, "before", "after"))
+```
+Okay, so we get some degree distributions, but do we get emergent individual variation in degree that's somewhat consistent throughout time?
+
+```{r}
+# Plot everyone's degree over time
+degreesDF %>%
+  ggplot(aes(x = slice, y = degree, col = individual, group = individual))+
+  geom_line()+
+  theme_minimal()
+
+# Let's just look at a few individuals, because this plot is too hard to read
+indivs <- sample(1:max(degreesDF$individual), 5)
+degreesDF %>%
+  filter(individual %in% indivs) %>%
+  ggplot(aes(x = slice, y = degree, col = factor(individual), group = individual))+
+  geom_line()+
+  theme_minimal()
+
+# This is still a little hard to see... let's look at just the "before" rows.
+degreesDF %>%
+  filter(individual %in% indivs, beforeAfter == "before") %>%
+  ggplot(aes(x = slice, y = degree, col = factor(individual), group = individual))+
+  geom_line()+
+  theme_minimal()
+
+# Okay, I'm seeing some differentiation, but no clear patterns. Because of how the model is set up, the rank order tends to be maintained for a few consecutive time steps, but not over the whole span of the baseline model. This makes sense, since individuals don't have any a priori reason to have higher or lower degrees than other individuals.
+```
+
+Now, going to compute three network-level measures before and after the removal of an individual.
+
+### 1. Network density deltas
+
+How does edge density behave over time?
+```{r}
+densities <- lapply(modelGraphs, function(x){
+  edge_density(x)
+ }) %>% 
+  unlist() %>% 
+  as.data.frame() %>%
+  setNames(., "density") %>%
+  mutate(slice = 1:length(modelGraphs))
+
+densities %>%
+  ggplot(aes(x = slice, y = density))+
+  geom_line()+
+  geom_smooth()+
+  theme_minimal()+
+  geom_vline(aes(xintercept = 50), size = 1, col = "red")
+```
+
+First delta: immediately before removal to after removal/pre-rewiring
+```{r}
+delta1_density <- igraph::edge_density(modelGraphs[[burn.in+1]])-igraph::edge_density(modelGraphs[[burn.in]])
+```
+
+Second delta: after removal/pre-rewiring to post-rewiring
+```{r}
+delta2_density <- igraph::edge_density(modelGraphs[[burn.in+2]])-igraph::edge_density(modelGraphs[[burn.in+1]])
+```
+
+### 2. Network connectivity (average path length) deltas
+
+How does connectivity behave over time?
+```{r}
+connectivities <- lapply(modelGraphs, function(x){
+  mean_distance(x)
+ }) %>% 
+  unlist() %>% 
+  as.data.frame() %>%
+  setNames(., "connectivity") %>%
+  mutate(slice = 1:length(modelGraphs))
+
+connectivities %>%
+  ggplot(aes(x = slice, y = connectivity))+
+  geom_line()+
+  geom_smooth()+
+  theme_minimal()+
+  geom_vline(aes(xintercept = 50), size = 1, col = "red")
+```
+
+First delta: immediately before removal to after removal/pre-rewiring
+```{r}
+delta1_meanDistance <- igraph::mean_distance(modelGraphs[[burn.in+1]])-igraph::mean_distance(modelGraphs[[burn.in]])
+```
+
+Second delta: after removal/pre-rewiring to post-rewiring
+```{r}
+delta2_meanDistance <- igraph::mean_distance(modelGraphs[[burn.in+2]])-igraph::mean_distance(modelGraphs[[burn.in+1]])
+```
+
+### 3. Network modularity deltas
+
+How does modularity behave over time?
+```{r}
+modularities <- lapply(modelGraphs, function(x){
+  cluster_fast_greedy(x) %>%
+    modularity()
+ }) %>% 
+  unlist() %>% 
+  as.data.frame() %>%
+  setNames(., "modularity") %>%
+  mutate(slice = 1:length(modelGraphs))
+
+modularities %>%
+  ggplot(aes(x = slice, y = modularity))+
+  geom_line()+
+  geom_smooth()+
+  theme_minimal()+
+  geom_vline(aes(xintercept = 50), size = 1, col = "red")
+```
+
+First delta: immediately before removal to after removal/pre-rewiring
+```{r}
+delta1_modularity <- modularity(cluster_fast_greedy(modelGraphs[[burn.in+1]]))-modularity(cluster_fast_greedy(modelGraphs[[burn.in]]))
+```
+
+Second delta: after removal/pre-rewiring to post-rewiring
+```{r}
+delta2_modularity <- modularity(cluster_fast_greedy(modelGraphs[[burn.in+2]]))-modularity(cluster_fast_greedy(modelGraphs[[burn.in+1]]))
+```
+
+## Now, run this simulation 100 times.
+```{r}
+
 ```
 
