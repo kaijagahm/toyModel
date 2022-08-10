@@ -18,22 +18,23 @@ library(igraph)
 source(here("modelFunction_rewiring.R"))
 ```
 
-First, let's run a model with a 7-day time window, 30 individuals.
+First, run the model.
 
 ```{r}
+burn.in = 50
 modelGraphs <- runModel(N = 50, # Nodes in the network
                      nodes.removed = 1, # Nodes to remove
                      n.removed = 1, # How many to remove at a time
                      edge.prob = 0.04, 
-                     burn.in = 50,
-                     burn.out = 50,
+                     burn.in = burn.in,
+                     burn.out = 10,
                      pm = 0.3,
                      ps = 0.1, 
                      pa = 0.2,
-                     add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
-                     lose01 = 0.3, 
-                     add10 = 0.2,
-                     lose11 = c(0.3283134, 0.3062181), # beta distribution parameters derived from parameterizingTheModel.Rmd.
+                     add00 = c(0.5, 10), 
+                     lose01 = 0.1, 
+                     add10 = 0.05,
+                     lose11 = c(0.5, 0.5), 
                      histMultiplier = 1.2,
                      doRemoval = TRUE) %>%
   lapply(., function(x){
@@ -58,7 +59,8 @@ Okay, so we get some degree distributions, but do we get emergent individual var
 degreesDF %>%
   ggplot(aes(x = slice, y = degree, col = individual, group = individual))+
   geom_line()+
-  theme_minimal()
+  theme_minimal()+
+  geom_vline(xintercept = burn.in+1, col = "red", size = 2)
 
 # Let's just look at a few individuals, because this plot is too hard to read
 indivs <- sample(1:max(degreesDF$individual), 5)
@@ -66,7 +68,8 @@ degreesDF %>%
   filter(individual %in% indivs) %>%
   ggplot(aes(x = slice, y = degree, col = factor(individual), group = individual))+
   geom_line()+
-  theme_minimal()
+  theme_minimal()+
+  geom_vline(xintercept = burn.in+1, col = "red", size = 2)
 
 # This is still a little hard to see... let's look at just the "before" rows.
 degreesDF %>%
@@ -97,7 +100,7 @@ densities %>%
   geom_line()+
   geom_smooth()+
   theme_minimal()+
-  geom_vline(aes(xintercept = 50), size = 1, col = "red")
+  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
 ```
 
 First delta: immediately before removal to after removal/pre-rewiring
@@ -127,7 +130,7 @@ connectivities %>%
   geom_line()+
   geom_smooth()+
   theme_minimal()+
-  geom_vline(aes(xintercept = 50), size = 1, col = "red")
+  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
 ```
 
 First delta: immediately before removal to after removal/pre-rewiring
@@ -158,7 +161,7 @@ modularities %>%
   geom_line()+
   geom_smooth()+
   theme_minimal()+
-  geom_vline(aes(xintercept = 50), size = 1, col = "red")
+  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
 ```
 
 First delta: immediately before removal to after removal/pre-rewiring
@@ -171,8 +174,97 @@ Second delta: after removal/pre-rewiring to post-rewiring
 delta2_modularity <- modularity(cluster_fast_greedy(modelGraphs[[burn.in+2]]))-modularity(cluster_fast_greedy(modelGraphs[[burn.in+1]]))
 ```
 
-## Now, run this simulation 100 times.
-```{r}
+## What should our measure be?
+I am not at all convinced that these momentary deltas are what I should be using. Seems like we need to at least consider two time steps out, since the model relies on this. Looking at the graphs above shows me how different the longer-term trends are from the short-term fluctuations.
 
+Let's run the model 100 times and see if trends emerge in how to measure.
+```{r}
+nRuns <- 100
+modelRuns <- vector(mode = "list", length = nRuns)
+for(i in 1:nRuns){
+  modelRuns[[i]] <- runModel(N = 50, # Nodes in the network
+                     nodes.removed = 1, # Nodes to remove
+                     n.removed = 1, # How many to remove at a time
+                     edge.prob = 0.04, 
+                     burn.in = 50,
+                     burn.out = 20,
+                     pm = 0.3,
+                     ps = 0.1, 
+                     pa = 0.2,
+                     add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
+                     lose01 = 0.3, 
+                     add10 = 0.2,
+                     lose11 = c(0.3283134, 0.3062181), # beta distribution parameters derived from parameterizingTheModel.Rmd.
+                     histMultiplier = 1.2,
+                     doRemoval = TRUE) %>%
+  lapply(., function(x){
+    igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+  })
+}
 ```
+
+# Compute the three network-level measures for each of the model runs.
+```{r}
+densList <- lapply(modelRuns, function(x){
+  lapply(x, function(y){
+    edge_density(y)
+  }) %>%
+    unlist() %>%
+    as.data.frame() %>%
+    setNames(., "density") %>%
+    mutate(slice = 1:nrow(.))
+})
+densDF <- data.table::rbindlist(densList, idcol = "run")
+
+connList <- lapply(modelRuns, function(x){
+  lapply(x, function(y){
+    mean_distance(y)
+  }) %>%
+    unlist() %>%
+    as.data.frame() %>%
+    setNames(., "connectivity") %>%
+    mutate(slice = 1:nrow(.))
+})
+connDF <- data.table::rbindlist(connList, idcol = "run")
+
+moduList <- lapply(modelRuns, function(x){
+  lapply(x, function(y){
+    cluster_fast_greedy(y) %>%
+    modularity()
+  }) %>%
+    unlist() %>%
+    as.data.frame() %>%
+    setNames(., "modularity") %>%
+    mutate(slice = 1:nrow(.))
+})
+moduDF <- data.table::rbindlist(moduList, idcol = "run")
+```
+
+Make some plots and try to detect any changepoint trends
+```{r}
+densDF %>%
+  ggplot(aes(x = slice, y = density))+
+  geom_line(aes(group = run, col = run), size = 0.1)+
+  geom_smooth()+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")+
+  scale_color_viridis_c()
+
+connDF %>%
+  ggplot(aes(x = slice, y = connectivity))+
+  geom_line(aes(group = run, col = run), size = 0.1)+
+  geom_smooth()+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")+
+  scale_color_viridis_c()
+
+moduDF %>%
+  ggplot(aes(x = slice, y = modularity))+
+  geom_line(aes(group = run, col = run), size = 0.1)+
+  geom_smooth()+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")+
+  scale_color_viridis_c()
+```
+
 
