@@ -65,8 +65,8 @@ runModel <- function(N = 50, # Nodes in the network
       
       # Now we have to remove the deleted node(s) from all networks following the removal.
       for(i in (burn.in+1):length(history)){
-        history[[i]] <- history[[i]][-del,]
-        history[[i]] <- history[[i]][,-del]
+        history[[i]] <- history[[i]][-rewired.del,]
+        history[[i]] <- history[[i]][,-rewired.del]
       }
       return(history)
     }
