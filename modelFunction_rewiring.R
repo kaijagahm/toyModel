@@ -62,6 +62,12 @@ runModel <- function(N = 50, # Nodes in the network
                                  add10 = add10, lose01 = lose01, lose11 = lose11)
         history[[i]] <- output # update history
       }
+      
+      # Now we have to remove the deleted node(s) from all networks following the removal.
+      for(i in (burn.in+1):length(history)){
+        history[[i]] <- history[[i]][-del,]
+        history[[i]] <- history[[i]][,-del]
+      }
       return(history)
     }
 }
