@@ -21,22 +21,36 @@ source(here("modelFunction_rewiring.R"))
 First, run the model.
 
 ```{r}
-burn.in = 50
-modelGraphs <- runModel(N = 50, # Nodes in the network
-                     nodes.removed = 1, # Nodes to remove
-                     n.removed = 1, # How many to remove at a time
-                     edge.prob = 0.04, 
+# Define parameters
+N = 100
+edge.prob <- 0.04
+burn.in = 20
+burn.out = 5
+pm = 0.3
+ps = 0.1
+pa = 0.2
+add00 = c(0.5, 10)
+lose01 = 0.1
+add10 = 0.05
+lose11 = c(0.5, 0.5)
+histMultiplier = 1.2
+doRemoval = TRUE
+```
+
+```{r}
+modelGraphs <- runModel(N = N, # Nodes in the network
+                     edge.prob = edge.prob, 
                      burn.in = burn.in,
-                     burn.out = 10,
-                     pm = 0.3,
-                     ps = 0.1, 
-                     pa = 0.2,
-                     add00 = c(0.5, 10), 
-                     lose01 = 0.1, 
-                     add10 = 0.05,
-                     lose11 = c(0.5, 0.5), 
-                     histMultiplier = 1.2,
-                     doRemoval = TRUE) %>%
+                     burn.out = burn.out,
+                     pm = pm,
+                     ps = ps, 
+                     pa = pa,
+                     add00 = add00, 
+                     lose01 = lose01, 
+                     add10 = add10,
+                     lose11 = lose11, 
+                     histMultiplier = histMultiplier,
+                     doRemoval = doRemoval) %>%
   lapply(., function(x){
     igraph::graph_from_adjacency_matrix(x, mode = "undirected")
   })
@@ -50,7 +64,7 @@ degrees <- lapply(modelGraphs, function(x){igraph::degree(x)})
 degreesDF <- do.call(cbind, degrees) %>% as.data.frame() %>% setNames(., 1:length(degrees)) %>% mutate(individual = 1:nrow(.)) %>%
   pivot_longer(cols = -individual, names_to = "slice", values_to = "degree") %>%
   mutate(slice = as.numeric(slice)) %>%
-  mutate(beforeAfter = ifelse(slice <= 50, "before", "after"))
+  mutate(beforeAfter = ifelse(slice <= burn.in, "before", "after"))
 ```
 Okay, so we get some degree distributions, but do we get emergent individual variation in degree that's somewhat consistent throughout time?
 
@@ -182,21 +196,19 @@ Let's run the model 100 times and see if trends emerge in how to measure.
 nRuns <- 100
 modelRuns <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
-  modelRuns[[i]] <- runModel(N = 50, # Nodes in the network
-                     nodes.removed = 1, # Nodes to remove
-                     n.removed = 1, # How many to remove at a time
-                     edge.prob = 0.04, 
-                     burn.in = 50,
-                     burn.out = 20,
-                     pm = 0.3,
-                     ps = 0.1, 
-                     pa = 0.2,
-                     add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
-                     lose01 = 0.3, 
-                     add10 = 0.2,
-                     lose11 = c(0.3283134, 0.3062181), # beta distribution parameters derived from parameterizingTheModel.Rmd.
-                     histMultiplier = 1.2,
-                     doRemoval = TRUE) %>%
+  modelRuns[[i]] <- runModel(N = N, # Nodes in the network
+                     edge.prob = edge.prob, 
+                     burn.in = burn.in,
+                     burn.out = burn.out,
+                     pm = pm,
+                     ps = ps, 
+                     pa = pa,
+                     add00 = add00, 
+                     lose01 = lose01, 
+                     add10 = add10,
+                     lose11 = lose11, 
+                     histMultiplier = histMultiplier,
+                     doRemoval = doRemoval) %>%
   lapply(., function(x){
     igraph::graph_from_adjacency_matrix(x, mode = "undirected")
   })
@@ -247,7 +259,7 @@ densDF %>%
   geom_line(aes(group = run, col = run), size = 0.1)+
   geom_smooth()+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
   scale_color_viridis_c()
 
 connDF %>%
@@ -255,7 +267,7 @@ connDF %>%
   geom_line(aes(group = run, col = run), size = 0.1)+
   geom_smooth()+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
   scale_color_viridis_c()
 
 moduDF %>%
@@ -263,7 +275,7 @@ moduDF %>%
   geom_line(aes(group = run, col = run), size = 0.1)+
   geom_smooth()+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
   scale_color_viridis_c()
 ```
 
