@@ -61,9 +61,13 @@ modelGraphs <- runModel(N = N, # Nodes in the network
 Compute degree for each of the model networks.
 ```{r}
 degrees <- lapply(modelGraphs, function(x){igraph::degree(x)})
-degreesDF <- do.call(cbind, degrees) %>% as.data.frame() %>% setNames(., 1:length(degrees)) %>% mutate(individual = 1:nrow(.)) %>%
-  pivot_longer(cols = -individual, names_to = "slice", values_to = "degree") %>%
-  mutate(slice = as.numeric(slice)) %>%
+degreesDF <- lapply(degrees, function(x){
+  as.data.frame(x) %>%
+    mutate(individual = 1:nrow(.)) %>%
+    rename("degree" = x)
+}) %>%
+  data.table::rbindlist(idcol = "slice") %>%
+  as.data.frame() %>%
   mutate(beforeAfter = ifelse(slice <= burn.in, "before", "after"))
 ```
 Okay, so we get some degree distributions, but do we get emergent individual variation in degree that's somewhat consistent throughout time?
@@ -278,5 +282,3 @@ moduDF %>%
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
   scale_color_viridis_c()
 ```
-
-
