@@ -204,7 +204,7 @@ modularities %>%
 # there doesn't seem to be a pattern in the ratio of nClusters to modularity, but I will investigate on a larger scale.
 ```
 
-I want to visually examine the clustering results to see if I see anything notable
+Visually examine the clustering results to see if I see anything notable
 ```{r}
 communities <- clustered[burn.in:(burn.in+2)]
 graphs <- modelGraphs[burn.in:(burn.in+2)]
@@ -213,6 +213,24 @@ map2(.x = communities, .y = graphs, .f = function(.x, .y){
   plot(.x, .y, vertex.size = 5)
 })
 
+```
+
+How does the clustering algorithm deal with isolated nodes?
+
+Well, we know that there are clusters of size 1. So it looks like isolated nodes are being included.
+
+What's the relationship between the number of isolated nodes vs. the number of clusters of size 1? In other words, how often, if ever, do we end up with a cluster of size 1 that is NOT an isolated node? I suspect that this graph is well-connected enough that this will never happen. I wonder under what conditions, if any, it would...
+
+```{r}
+isolatedNodes <- lapply(modelGraphs, function(x){
+  sum(degree(x) == 0)
+}) %>% unlist()
+
+singletonClusters <- lapply(clustered, function(x){
+  sum(sizes(x) == 1)
+}) %>% unlist()
+
+plot(singletonClusters ~ isolatedNodes, type = "l") # okay yeah, there's a perfect relationship between these. This tells us that there are no cases in which we get a cluster of size 1 that is NOT an isolated node.
 ```
 
 
