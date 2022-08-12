@@ -204,6 +204,18 @@ modularities %>%
 # there doesn't seem to be a pattern in the ratio of nClusters to modularity, but I will investigate on a larger scale.
 ```
 
+I want to visually examine the clustering results to see if I see anything notable
+```{r}
+communities <- clustered[burn.in:(burn.in+2)]
+graphs <- modelGraphs[burn.in:(burn.in+2)]
+
+map2(.x = communities, .y = graphs, .f = function(.x, .y){
+  plot(.x, .y, vertex.size = 5)
+})
+
+```
+
+
 First delta: immediately before removal to after removal/pre-rewiring
 ```{r}
 delta1_modularity <- modularity(cluster_fast_greedy(modelGraphs[[burn.in+1]]))-modularity(cluster_fast_greedy(modelGraphs[[burn.in]]))
