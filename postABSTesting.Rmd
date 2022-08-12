@@ -56,12 +56,14 @@ modelGraphs <- runModel(N = N, # Nodes in the network
   })
 ```
 
-1. How does variation in degree emerge in this model?
+1. How does variation in degree and betweenness emerge in this model?
 
-Compute degree for each of the model networks.
+Compute degree and betweenness for each of the model networks.
 ```{r}
-degreesDF <- lapply(modelGraphs, function(x){
-  set_vertex_attr(x, name = "degree", value = degree(x)) %>%
+attrDF <- lapply(modelGraphs, function(x){
+  x %>%
+    set_vertex_attr(., name = "degree", value = degree(x)) %>%
+    set_vertex_attr(., name = "betweenness", value = betweenness(x)) %>%
     tidygraph::as_tbl_graph() %>%
     tidygraph::activate(nodes) %>%
     data.frame()
@@ -69,31 +71,39 @@ degreesDF <- lapply(modelGraphs, function(x){
   data.table::rbindlist(idcol = "slice") %>%
   as.data.frame() %>%
   mutate(beforeAfter = ifelse(slice <= burn.in, "before", "after"))
+
+# make a long-format version to use for facetted plots
+attrDFLong <- attrDF %>%
+    pivot_longer(cols = c(degree, betweenness), names_to = "measure", values_to = "value")
 ```
-Okay, so we get some degree distributions, but do we get emergent label variation in degree that's somewhat consistent throughout time?
+
+View degree and betweenness over time
 
 ```{r}
-# Plot everyone's degree over time
-degreesDF %>%
-  ggplot(aes(x = slice, y = degree, col = label, group = label))+
+# Degree and betweenness over time
+attrDFLong %>%
+  ggplot(aes(x = slice, y = value, col = label, group = label))+
+  facet_wrap(~measure, scales = "free")+
   geom_line(alpha = 0.7, size = 0.5)+
   theme_minimal()+
-  geom_vline(xintercept = burn.in+1, col = "red", size = 2)+
+  geom_vline(xintercept = burn.in+1, col = "red", size = 1)+
   theme(legend.position = "none")
 
 # Let's just look at a few labels, because this plot is too hard to read
-indivs <- sample(degreesDF$label, 5)
-degreesDF %>%
+indivs <- sample(unique(attrDFLong$label), 5)
+attrDFLong %>%
   filter(label %in% indivs) %>%
-  ggplot(aes(x = slice, y = degree, col = factor(label), group = label))+
+  ggplot(aes(x = slice, y = value, col = label, group = label))+
+  facet_wrap(~measure, scales = "free")+
   geom_line()+
   theme_minimal()+
-  geom_vline(xintercept = burn.in+1, col = "red", size = 2)
+  geom_vline(xintercept = burn.in+1, col = "red", size = 1)
 
 # This is still a little hard to see... let's look at just the "before" rows.
-degreesDF %>%
+attrDFLong %>%
   filter(label %in% indivs, beforeAfter == "before") %>%
-  ggplot(aes(x = slice, y = degree, col = factor(label), group = label))+
+  ggplot(aes(x = slice, y = value, col = label, group = label))+
+  facet_wrap(~measure, scales = "free")+
   geom_line()+
   theme_minimal()
 
