@@ -52,7 +52,7 @@ modelGraphs <- runModel(N = N, # Nodes in the network
                      histMultiplier = histMultiplier,
                      doRemoval = doRemoval) %>%
   lapply(., function(x){
-    igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+    igraph::graph_from_adjacency_matrix(x, mode = "undirected", add.colnames = "label")
   })
 ```
 
@@ -60,46 +60,47 @@ modelGraphs <- runModel(N = N, # Nodes in the network
 
 Compute degree for each of the model networks.
 ```{r}
-degrees <- lapply(modelGraphs, function(x){igraph::degree(x)})
-degreesDF <- lapply(degrees, function(x){
-  as.data.frame(x) %>%
-    mutate(individual = 1:nrow(.)) %>%
-    rename("degree" = x)
-}) %>%
+degreesDF <- lapply(modelGraphs, function(x){
+  set_vertex_attr(x, name = "degree", value = degree(x)) %>%
+    tidygraph::as_tbl_graph() %>%
+    tidygraph::activate(nodes) %>%
+    data.frame()
+  }) %>%
   data.table::rbindlist(idcol = "slice") %>%
   as.data.frame() %>%
   mutate(beforeAfter = ifelse(slice <= burn.in, "before", "after"))
 ```
-Okay, so we get some degree distributions, but do we get emergent individual variation in degree that's somewhat consistent throughout time?
+Okay, so we get some degree distributions, but do we get emergent label variation in degree that's somewhat consistent throughout time?
 
 ```{r}
 # Plot everyone's degree over time
 degreesDF %>%
-  ggplot(aes(x = slice, y = degree, col = individual, group = individual))+
-  geom_line()+
+  ggplot(aes(x = slice, y = degree, col = label, group = label))+
+  geom_line(alpha = 0.7, size = 0.5)+
   theme_minimal()+
-  geom_vline(xintercept = burn.in+1, col = "red", size = 2)
+  geom_vline(xintercept = burn.in+1, col = "red", size = 2)+
+  theme(legend.position = "none")
 
-# Let's just look at a few individuals, because this plot is too hard to read
-indivs <- sample(1:max(degreesDF$individual), 5)
+# Let's just look at a few labels, because this plot is too hard to read
+indivs <- sample(degreesDF$label, 5)
 degreesDF %>%
-  filter(individual %in% indivs) %>%
-  ggplot(aes(x = slice, y = degree, col = factor(individual), group = individual))+
+  filter(label %in% indivs) %>%
+  ggplot(aes(x = slice, y = degree, col = factor(label), group = label))+
   geom_line()+
   theme_minimal()+
   geom_vline(xintercept = burn.in+1, col = "red", size = 2)
 
 # This is still a little hard to see... let's look at just the "before" rows.
 degreesDF %>%
-  filter(individual %in% indivs, beforeAfter == "before") %>%
-  ggplot(aes(x = slice, y = degree, col = factor(individual), group = individual))+
+  filter(label %in% indivs, beforeAfter == "before") %>%
+  ggplot(aes(x = slice, y = degree, col = factor(label), group = label))+
   geom_line()+
   theme_minimal()
 
-# Okay, I'm seeing some differentiation, but no clear patterns. Because of how the model is set up, the rank order tends to be maintained for a few consecutive time steps, but not over the whole span of the baseline model. This makes sense, since individuals don't have any a priori reason to have higher or lower degrees than other individuals.
+# Okay, I'm seeing some differentiation, but no clear patterns. Because of how the model is set up, the rank order tends to be maintained for a few consecutive time steps, but not over the whole span of the baseline model. This makes sense, since labels don't have any a priori reason to have higher or lower degrees than other labels.
 ```
 
-Now, going to compute three network-level measures before and after the removal of an individual.
+Now, going to compute three network-level measures before and after the removal of an label.
 
 ### 1. Network density deltas
 
