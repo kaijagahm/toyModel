@@ -63,6 +63,12 @@ runModel <- function(N = 50, # Nodes in the network
         history[[i]] <- output # update history
       }
       
+      # Make sure column names are assigned so we can keep track of the nodes!
+      history <- lapply(history, function(x){
+        colnames(x) <- paste0("v", 1:ncol(x))
+        return(x)
+      })
+      
       # Now we have to remove the deleted node(s) from all networks following the removal.
       for(i in (burn.in+1):length(history)){
         history[[i]] <- history[[i]][-rewired.del,]
