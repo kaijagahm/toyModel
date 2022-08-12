@@ -230,18 +230,45 @@ singletonClusters <- lapply(clustered, function(x){
   sum(sizes(x) == 1)
 }) %>% unlist()
 
-plot(singletonClusters ~ isolatedNodes, type = "l") # okay yeah, there's a perfect relationship between these. This tells us that there are no cases in which we get a cluster of size 1 that is NOT an isolated node.
+plot(singletonClusters ~ isolatedNodes) # okay yeah, there's a perfect relationship between these. This tells us that there are no cases in which we get a cluster of size 1 that is NOT an isolated node.
+```
+Let's examine what happens if we do the modularity calculations on networks with any isolated nodes removed!
+```{r}
+noIso <- lapply(modelGraphs, function(x){
+  g <- delete_vertices(x, which(degree(x) == 0))
+})
 ```
 
+How does modularity behave over time when we remove isolated nodes?
+```{r warning = FALSE}
+clustered_noIso <- lapply(noIso, function(x){
+  cluster_fast_greedy(x)
+ })
+  
+mods_noIso <- data.frame(slice = 1:length(clustered_noIso),
+                           modularity = unlist(lapply(clustered_noIso, modularity)),
+                           nClusters = unlist(lapply(clustered_noIso, length)),
+                           nIndivs = unlist(lapply(clustered_noIso, function(x){length(membership(x))})))
+
+mods_noIso %>%
+  ggplot(aes(x = slice, y = modularity))+
+  geom_line()+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")+
+  ggtitle("modularity over time, without isolated nodes")
+```
+This may look exactly the same as the above graph. That's because when N is large, there are hardly any isolated nodes.
 
 First delta: immediately before removal to after removal/pre-rewiring
 ```{r}
 delta1_modularity <- modularity(cluster_fast_greedy(modelGraphs[[burn.in+1]]))-modularity(cluster_fast_greedy(modelGraphs[[burn.in]]))
+delta1_modularity_noIso <- modularity(cluster_fast_greedy(noIso[[burn.in+1]]))-modularity(cluster_fast_greedy(noIso[[burn.in]]))
 ```
 
 Second delta: after removal/pre-rewiring to post-rewiring
 ```{r}
 delta2_modularity <- modularity(cluster_fast_greedy(modelGraphs[[burn.in+2]]))-modularity(cluster_fast_greedy(modelGraphs[[burn.in+1]]))
+delta2_modularity_noIso <- modularity(cluster_fast_greedy(noIso[[burn.in+2]]))-modularity(cluster_fast_greedy(noIso[[burn.in+1]]))
 ```
 
 ## What should our measure be?
@@ -303,8 +330,28 @@ moduList <- lapply(modelRuns, function(x){
                      nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
     return(df)
 })
-
 moduDF <- data.table::rbindlist(moduList, idcol = "run")
+```
+
+Separate chunk for doing the calculations on the no-isolated-nodes graphs, so we don't unnecessarily suppress warnings for the other parts of the code.
+```{r warning = FALSE}
+modelRuns_noIso <- lapply(modelRuns, function(x){
+  lapply(x, function(y){
+    delete_vertices(y, which(degree(y) == 0))
+  })
+})
+moduList_noIso <- lapply(modelRuns, function(x){
+    noIso <- lapply(x, function(a){
+      delete_vertices(a, which(degree(a) == 0))
+    })
+    clustered <- lapply(noIso, cluster_fast_greedy)
+    df <- data.frame(slice = 1:length(clustered),
+                     modularity = unlist(lapply(clustered, modularity)),
+                     nClusters = unlist(lapply(clustered, length)),
+                     nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
+    return(df)
+})
+moduDF_noIso <- data.table::rbindlist(moduList_noIso, idcol = "run")
 ```
 
 Make some plots and try to detect any changepoint trends
@@ -328,8 +375,20 @@ moduDF %>%
   geom_line(aes(group = run, col = run), size = 0.1)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
-  scale_color_viridis_c()
+  scale_color_viridis_c() +
+  ggtitle("includes isolated nodes")
 
+moduDF_noIso %>%
+  ggplot(aes(x = slice, y = modularity))+
+  geom_line(aes(group = run, col = run), size = 0.1)+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
+  scale_color_viridis_c()+
+  ggtitle("no isolated nodes")
+# This should look basically the same as the previous graph, since there are very few isolated nodes.
+```
+
+```{r}
 moduDF %>%
   filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nClusters))+
