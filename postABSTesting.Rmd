@@ -127,7 +127,6 @@ densities <- lapply(modelGraphs, function(x){
 densities %>%
   ggplot(aes(x = slice, y = density))+
   geom_line()+
-  geom_smooth()+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
 ```
@@ -157,7 +156,6 @@ connectivities <- lapply(modelGraphs, function(x){
 connectivities %>%
   ggplot(aes(x = slice, y = connectivity))+
   geom_line()+
-  geom_smooth()+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
 ```
@@ -176,21 +174,34 @@ delta2_meanDistance <- igraph::mean_distance(modelGraphs[[burn.in+2]])-igraph::m
 
 How does modularity behave over time?
 ```{r}
-modularities <- lapply(modelGraphs, function(x){
-  cluster_fast_greedy(x) %>%
-    modularity()
- }) %>% 
-  unlist() %>% 
-  as.data.frame() %>%
-  setNames(., "modularity") %>%
-  mutate(slice = 1:length(modelGraphs))
+clustered <- lapply(modelGraphs, function(x){
+  x %>%
+    cluster_fast_greedy()
+ }) 
+  
+modularities <- data.frame(slice = 1:length(clustered),
+                           modularity = unlist(lapply(clustered, modularity)),
+                           nClusters = unlist(lapply(clustered, length)),
+                           nIndivs = unlist(lapply(clustered, function(x){length(membership(x))})))
 
 modularities %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line()+
-  geom_smooth()+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
+
+modularities %>%
+  ggplot(aes(x = slice, y = nClusters))+
+  geom_line()+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
+
+modularities %>%
+  ggplot(aes(x = slice, y = nClusters/modularity))+
+  geom_line()+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
+# there doesn't seem to be a pattern in the ratio of nClusters to modularity, but I will investigate on a larger scale.
 ```
 
 First delta: immediately before removal to after removal/pre-rewiring
@@ -255,15 +266,14 @@ connList <- lapply(modelRuns, function(x){
 connDF <- data.table::rbindlist(connList, idcol = "run")
 
 moduList <- lapply(modelRuns, function(x){
-  lapply(x, function(y){
-    cluster_fast_greedy(y) %>%
-    modularity()
-  }) %>%
-    unlist() %>%
-    as.data.frame() %>%
-    setNames(., "modularity") %>%
-    mutate(slice = 1:nrow(.))
+    clustered <- lapply(x, cluster_fast_greedy)
+    df <- data.frame(slice = 1:length(clustered),
+                     modularity = unlist(lapply(clustered, modularity)),
+                     nClusters = unlist(lapply(clustered, length)),
+                     nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
+    return(df)
 })
+
 moduDF <- data.table::rbindlist(moduList, idcol = "run")
 ```
 
@@ -272,7 +282,6 @@ Make some plots and try to detect any changepoint trends
 densDF %>%
   ggplot(aes(x = slice, y = density))+
   geom_line(aes(group = run, col = run), size = 0.1)+
-  geom_smooth()+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
   scale_color_viridis_c()
@@ -280,7 +289,6 @@ densDF %>%
 connDF %>%
   ggplot(aes(x = slice, y = connectivity))+
   geom_line(aes(group = run, col = run), size = 0.1)+
-  geom_smooth()+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
   scale_color_viridis_c()
@@ -288,8 +296,23 @@ connDF %>%
 moduDF %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line(aes(group = run, col = run), size = 0.1)+
-  geom_smooth()+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
   scale_color_viridis_c()
+
+moduDF %>%
+  filter(slice > 3) %>%
+  ggplot(aes(x = slice, y = nClusters))+
+  geom_line(aes(group = run, col = run), size = 0.1)+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
+  scale_color_viridis_c()
+
+moduDF %>%
+  ggplot(aes(x = slice, y = modularity/nClusters))+
+  geom_line(aes(group = run, col = run), size = 0.1)+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
+  scale_color_viridis_c()
+# Absolutely no pattern at all in the ratio of clusters to modularity.
 ```
