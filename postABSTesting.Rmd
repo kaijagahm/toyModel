@@ -22,7 +22,7 @@ First, run the model.
 
 ```{r}
 # Define parameters
-N = 100
+N = 50
 edge.prob <- 0.04
 burn.in = 20
 burn.out = 5
@@ -204,6 +204,7 @@ modularities %>%
 # there doesn't seem to be a pattern in the ratio of nClusters to modularity, but I will investigate on a larger scale.
 ```
 
+
 Visually examine the clustering results to see if I see anything notable
 ```{r}
 communities <- clustered[burn.in:(burn.in+2)]
@@ -222,16 +223,17 @@ Well, we know that there are clusters of size 1. So it looks like isolated nodes
 What's the relationship between the number of isolated nodes vs. the number of clusters of size 1? In other words, how often, if ever, do we end up with a cluster of size 1 that is NOT an isolated node? I suspect that this graph is well-connected enough that this will never happen. I wonder under what conditions, if any, it would...
 
 ```{r}
-isolatedNodes <- lapply(modelGraphs, function(x){
+nIsolatedNodes <- lapply(modelGraphs, function(x){
   sum(degree(x) == 0)
 }) %>% unlist()
 
-singletonClusters <- lapply(clustered, function(x){
+nSingletonClusters <- lapply(clustered, function(x){
   sum(sizes(x) == 1)
 }) %>% unlist()
 
-plot(singletonClusters ~ isolatedNodes) # okay yeah, there's a perfect relationship between these. This tells us that there are no cases in which we get a cluster of size 1 that is NOT an isolated node.
+plot(nSingletonClusters ~ nIsolatedNodes) # okay yeah, there's a perfect relationship between these. This tells us that there are no cases in which we get a cluster of size 1 that is NOT an isolated node.
 ```
+
 Let's examine what happens if we do the modularity calculations on networks with any isolated nodes removed!
 ```{r}
 noIso <- lapply(modelGraphs, function(x){
