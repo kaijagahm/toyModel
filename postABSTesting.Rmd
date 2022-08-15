@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, out.width = "100%")
 ```
 
 ```{r warning = FALSE, message = FALSE}
@@ -39,18 +39,18 @@ doRemoval = TRUE
 
 ```{r}
 modelGraphs <- runModel(N = N, # Nodes in the network
-                     edge.prob = edge.prob, 
-                     burn.in = burn.in,
-                     burn.out = burn.out,
-                     pm = pm,
-                     ps = ps, 
-                     pa = pa,
-                     add00 = add00, 
-                     lose01 = lose01, 
-                     add10 = add10,
-                     lose11 = lose11, 
-                     histMultiplier = histMultiplier,
-                     doRemoval = doRemoval) %>%
+                        edge.prob = edge.prob, 
+                        burn.in = burn.in,
+                        burn.out = burn.out,
+                        pm = pm,
+                        ps = ps, 
+                        pa = pa,
+                        add00 = add00, 
+                        lose01 = lose01, 
+                        add10 = add10,
+                        lose11 = lose11, 
+                        histMultiplier = histMultiplier,
+                        doRemoval = doRemoval) %>%
   lapply(., function(x){
     igraph::graph_from_adjacency_matrix(x, mode = "undirected", add.colnames = "label")
   })
@@ -67,14 +67,14 @@ attrDF <- lapply(modelGraphs, function(x){
     tidygraph::as_tbl_graph() %>%
     tidygraph::activate(nodes) %>%
     data.frame()
-  }) %>%
+}) %>%
   data.table::rbindlist(idcol = "slice") %>%
   as.data.frame() %>%
   mutate(beforeAfter = ifelse(slice <= burn.in, "before", "after"))
 
 # make a long-format version to use for facetted plots
 attrDFLong <- attrDF %>%
-    pivot_longer(cols = c(degree, betweenness), names_to = "measure", values_to = "value")
+  pivot_longer(cols = c(degree, betweenness), names_to = "measure", values_to = "value")
 ```
 
 View degree and betweenness over time
@@ -118,7 +118,7 @@ How does edge density behave over time?
 ```{r}
 densities <- lapply(modelGraphs, function(x){
   edge_density(x)
- }) %>% 
+}) %>% 
   unlist() %>% 
   as.data.frame() %>%
   setNames(., "density") %>%
@@ -147,7 +147,7 @@ How does connectivity behave over time?
 ```{r}
 connectivities <- lapply(modelGraphs, function(x){
   mean_distance(x)
- }) %>% 
+}) %>% 
   unlist() %>% 
   as.data.frame() %>%
   setNames(., "connectivity") %>%
@@ -177,8 +177,8 @@ How does modularity behave over time?
 clustered <- lapply(modelGraphs, function(x){
   x %>%
     cluster_fast_greedy()
- }) 
-  
+}) 
+
 modularities <- data.frame(slice = 1:length(clustered),
                            modularity = unlist(lapply(clustered, modularity)),
                            nClusters = unlist(lapply(clustered, length)),
@@ -245,12 +245,12 @@ How does modularity behave over time when we remove isolated nodes?
 ```{r warning = FALSE}
 clustered_noIso <- lapply(noIso, function(x){
   cluster_fast_greedy(x)
- })
-  
+})
+
 mods_noIso <- data.frame(slice = 1:length(clustered_noIso),
-                           modularity = unlist(lapply(clustered_noIso, modularity)),
-                           nClusters = unlist(lapply(clustered_noIso, length)),
-                           nIndivs = unlist(lapply(clustered_noIso, function(x){length(membership(x))})))
+                         modularity = unlist(lapply(clustered_noIso, modularity)),
+                         nClusters = unlist(lapply(clustered_noIso, length)),
+                         nIndivs = unlist(lapply(clustered_noIso, function(x){length(membership(x))})))
 
 mods_noIso %>%
   ggplot(aes(x = slice, y = modularity))+
@@ -282,21 +282,21 @@ nRuns <- 100
 modelRuns <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
   modelRuns[[i]] <- runModel(N = N, # Nodes in the network
-                     edge.prob = edge.prob, 
-                     burn.in = burn.in,
-                     burn.out = burn.out,
-                     pm = pm,
-                     ps = ps, 
-                     pa = pa,
-                     add00 = add00, 
-                     lose01 = lose01, 
-                     add10 = add10,
-                     lose11 = lose11, 
-                     histMultiplier = histMultiplier,
-                     doRemoval = doRemoval) %>%
-  lapply(., function(x){
-    igraph::graph_from_adjacency_matrix(x, mode = "undirected")
-  })
+                             edge.prob = edge.prob, 
+                             burn.in = burn.in,
+                             burn.out = burn.out,
+                             pm = pm,
+                             ps = ps, 
+                             pa = pa,
+                             add00 = add00, 
+                             lose01 = lose01, 
+                             add10 = add10,
+                             lose11 = lose11, 
+                             histMultiplier = histMultiplier,
+                             doRemoval = doRemoval) %>%
+    lapply(., function(x){
+      igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+    })
 }
 ```
 
@@ -325,12 +325,12 @@ connList <- lapply(modelRuns, function(x){
 connDF <- data.table::rbindlist(connList, idcol = "run")
 
 moduList <- lapply(modelRuns, function(x){
-    clustered <- lapply(x, cluster_fast_greedy)
-    df <- data.frame(slice = 1:length(clustered),
-                     modularity = unlist(lapply(clustered, modularity)),
-                     nClusters = unlist(lapply(clustered, length)),
-                     nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
-    return(df)
+  clustered <- lapply(x, cluster_fast_greedy)
+  df <- data.frame(slice = 1:length(clustered),
+                   modularity = unlist(lapply(clustered, modularity)),
+                   nClusters = unlist(lapply(clustered, length)),
+                   nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
+  return(df)
 })
 moduDF <- data.table::rbindlist(moduList, idcol = "run")
 ```
@@ -343,15 +343,15 @@ modelRuns_noIso <- lapply(modelRuns, function(x){
   })
 })
 moduList_noIso <- lapply(modelRuns, function(x){
-    noIso <- lapply(x, function(a){
-      delete_vertices(a, which(degree(a) == 0))
-    })
-    clustered <- lapply(noIso, cluster_fast_greedy)
-    df <- data.frame(slice = 1:length(clustered),
-                     modularity = unlist(lapply(clustered, modularity)),
-                     nClusters = unlist(lapply(clustered, length)),
-                     nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
-    return(df)
+  noIso <- lapply(x, function(a){
+    delete_vertices(a, which(degree(a) == 0))
+  })
+  clustered <- lapply(noIso, cluster_fast_greedy)
+  df <- data.frame(slice = 1:length(clustered),
+                   modularity = unlist(lapply(clustered, modularity)),
+                   nClusters = unlist(lapply(clustered, length)),
+                   nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
+  return(df)
 })
 moduDF_noIso <- data.table::rbindlist(moduList_noIso, idcol = "run")
 ```
@@ -407,3 +407,196 @@ moduDF %>%
   scale_color_viridis_c()
 # Absolutely no pattern at all in the ratio of clusters to modularity.
 ```
+
+## 4. Relationship between removed node and network-level measures
+
+```{r}
+networkLevel <- left_join(densDF, connDF, by = c("run", "slice")) %>%
+  left_join(moduDF, by = c("run", "slice"))
+
+deltas <- networkLevel %>%
+  filter(slice %in% c(burn.in, burn.in+1, burn.in+2)) %>%
+  group_by(run) %>%
+  summarize(dens1 = density[2]-density[1],
+            dens2 = density[3]-density[2],
+            conn1 = connectivity[2]-connectivity[1],
+            conn2 = connectivity[3]-connectivity[2],
+            modu1 = modularity[2]-modularity[1],
+            modu2 = modularity[3]-modularity[2]) %>%
+  pivot_longer(cols = -run, names_to = "measure", values_to = "value") %>%
+  mutate(type = stringr::str_extract(measure, "[0-9]"),
+         measure = stringr::str_remove(measure, "[0-9]")) %>%
+  mutate(type = ifelse(type == 1, "Before rewiring", "After rewiring"))
+  
+# Info about the removed node
+removedInfo <- lapply(modelRuns, function(x){
+  init <- V(x[[1]])$name
+  final <- V(x[[length(x)]])$name
+  removedNumber <- which(!(init %in% final))
+  removedName <- init[!(init %in% final)]
+  removedDegree <- degree(x[[burn.in]])[removedNumber]
+  removedBetweenness <- betweenness(x[[burn.in]])[removedNumber]
+  df <- data.frame(name = removedName, number = removedNumber, 
+                   degree = removedDegree,
+                   btwn = removedBetweenness)
+  return(df)
+}) %>%
+  data.table::rbindlist(idcol = "run") %>%
+  as.data.frame()
+
+# Combine individual-level and network-level info so we can compare them
+full <- removedInfo %>%
+  left_join(deltas, by = "run") %>%
+  mutate(label = case_when(measure == "modu" ~ "\u0394 Modularity",
+                           measure == "conn" ~ "\u0394 Connectivity (mean distance)",
+                           measure == "dens" ~ "\u0394 Edge Density",
+                           TRUE ~ NA_character_))
+```
+
+Okay, now that the data is prepared, let's graph it!
+```{r}
+# Degree and betweenness are probably highly correlated. Let's check.
+removedInfo %>%
+  ggplot(aes(x = degree, y = btwn))+
+  geom_point(shape = 1)+
+  geom_smooth(method = "lm")+
+  theme_minimal()+
+  ylab("Betweenness")+
+  xlab("Degree")
+```
+
+They are indeed highly correlated. So we should expect very similar effects...
+```{r}
+# DEGREE VS. DELTA 1
+full %>%
+  filter(type == "Before rewiring") %>%
+  ggplot(aes(x = degree, y = value))+
+  geom_point(shape = 1)+
+  geom_smooth(method = "lm", col = "blue")+
+  facet_wrap(~label, scales = "free", strip.position = "left")+
+  theme_minimal()+
+  theme(strip.placement = "outside")+
+  ylab("")+
+  xlab("Degree of removed node")+
+  ggtitle("Before rewiring")
+  
+# DEGREE VS. DELTA 2
+full %>%
+  filter(type == "After rewiring") %>%
+  ggplot(aes(x = degree, y = value))+
+  geom_point(shape = 1)+
+  geom_smooth(method = "lm", col = "red")+
+  facet_wrap(~label, scales = "free", strip.position = "left")+
+  theme_minimal()+
+  theme(strip.placement = "outside")+
+  ylab("")+
+  xlab("Degree of removed node")+
+  ggtitle("After rewiring")
+
+# BTWN VS. DELTA 1
+full %>%
+  filter(type == "Before rewiring") %>%
+  ggplot(aes(x = btwn, y = value))+
+  geom_point(shape = 1)+
+  geom_smooth(method = "lm", col = "blue")+
+  facet_wrap(~label, scales = "free", strip.position = "left")+
+  theme_minimal()+
+  theme(strip.placement = "outside")+
+  ylab("")+
+  xlab("Betweenness of removed node")+
+  ggtitle("Before rewiring")
+  
+# BTWN VS. DELTA 2
+full %>%
+  filter(type == "After rewiring") %>%
+  ggplot(aes(x = btwn, y = value))+
+  geom_point(shape = 1)+
+  geom_smooth(method = "lm", col = "red")+
+  facet_wrap(~label, scales = "free", strip.position = "left")+
+  theme_minimal()+
+  theme(strip.placement = "outside")+
+  ylab("")+
+  xlab("Betweenness of removed node")+
+  ggtitle("After rewiring")
+
+```
+
+What about the ratio between the first and second changes? Aka: what percentage of the loss/gain is recovered by the rewiring? Should be delta2/delta1.
+
+```{r}
+deltaRatios <- full %>%
+  group_by(run, name, number, degree, btwn, measure, label) %>%
+  summarize(ratio = value[2]/value[1],
+            absRatio = abs(ratio))
+
+# Remove any that are too huge (above 200)
+deltaRatios <- deltaRatios %>%
+  filter(ratio < 200)
+
+# DEGREE VS. DELTA RATIO
+deltaRatios %>%
+  mutate(measure = case_when(measure == "modu" ~ "Modularity",
+                             measure == "dens" ~ "Density",
+                             measure == "conn" ~ "Connectivity",
+                             TRUE ~ NA_character_)) %>%
+  ggplot(aes(x = degree, y = ratio))+
+  geom_point(shape = 1)+
+  geom_smooth(method = "lm", col = "blue")+
+  facet_wrap(~measure, scales = "free", strip.position = "left")+
+  theme_minimal()+
+  theme(strip.placement = "outside")+
+  ylab("")+
+  xlab("Degree of removed node")+
+  ggtitle("Ratio of \u0394 after rewiring to \u0394 before rewiring")
+
+# DEGREE VS. abs(DELTA RATIO)
+deltaRatios %>%
+  mutate(measure = case_when(measure == "modu" ~ "Modularity",
+                             measure == "dens" ~ "Density",
+                             measure == "conn" ~ "Connectivity",
+                             TRUE ~ NA_character_)) %>%
+  ggplot(aes(x = degree, y = absRatio))+
+  geom_point(shape = 1)+
+  geom_smooth(method = "lm", col = "blue")+
+  facet_wrap(~measure, scales = "free", strip.position = "left")+
+  theme_minimal()+
+  theme(strip.placement = "outside")+
+  ylab("")+
+  xlab("Degree of removed node")+
+  ggtitle("|Ratio of \u0394 after rewiring to \u0394 before rewiring|")
+
+# BTWN VS. DELTA RATIO
+deltaRatios %>%
+  mutate(measure = case_when(measure == "modu" ~ "Modularity",
+                             measure == "dens" ~ "Density",
+                             measure == "conn" ~ "Connectivity",
+                             TRUE ~ NA_character_)) %>%
+  ggplot(aes(x = btwn, y = ratio))+
+  geom_point(shape = 1)+
+  geom_smooth(method = "lm", col = "blue")+
+  facet_wrap(~measure, scales = "free", strip.position = "left")+
+  theme_minimal()+
+  theme(strip.placement = "outside")+
+  ylab("")+
+  xlab("Betweenness of removed node")+
+  ggtitle("Ratio of \u0394 after rewiring to \u0394 before rewiring")
+
+# BTWN VS. abs(DELTA RATIO)
+deltaRatios %>%
+  mutate(measure = case_when(measure == "modu" ~ "Modularity",
+                             measure == "dens" ~ "Density",
+                             measure == "conn" ~ "Connectivity",
+                             TRUE ~ NA_character_)) %>%
+  ggplot(aes(x = btwn, y = absRatio))+
+  geom_point(shape = 1)+
+  geom_smooth(method = "lm", col = "blue")+
+  facet_wrap(~measure, scales = "free", strip.position = "left")+
+  theme_minimal()+
+  theme(strip.placement = "outside")+
+  ylab("")+
+  xlab("Betweenness of removed node")+
+  ggtitle("|Ratio of \u0394 after rewiring to \u0394 before rewiring|")
+```
+
+
+
