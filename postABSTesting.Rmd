@@ -6,8 +6,10 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, out.width = "100%")
+knitr::opts_chunk$set(echo = TRUE, out.width = "100%", message = FALSE)
 ```
+
+Load some packages that we'll need to use to do these calculations:
 
 ```{r warning = FALSE, message = FALSE}
 library(tidyverse)
@@ -18,9 +20,9 @@ library(igraph)
 source(here("modelFunction_rewiring.R"))
 ```
 
-First, run the model.
+## 1. Run the model once
 
-```{r}
+```{r code_folding = F}
 # Define parameters
 N = 50
 edge.prob <- 0.04
@@ -54,12 +56,16 @@ modelGraphs <- runModel(N = N, # Nodes in the network
   lapply(., function(x){
     igraph::graph_from_adjacency_matrix(x, mode = "undirected", add.colnames = "label")
   })
+
 ```
 
-1. How does variation in degree and betweenness emerge in this model?
+## 2. How does variation in degree and betweenness emerge in this model?
 
-Compute degree and betweenness for each of the model networks.
-```{r}
+Because I have not given individuals different tendencies to associate with others, we don't expect to see consistent individual variation in betweenness or degree. It should emerge in each time slice from the random interactions, but there's no reason it should be consistent across time slices.
+
+Compute degree and betweenness for each of the model networks, and visualize how they change over time.
+
+```{r echo = FALSE}
 attrDF <- lapply(modelGraphs, function(x){
   x %>%
     set_vertex_attr(., name = "degree", value = degree(x)) %>%
@@ -77,9 +83,7 @@ attrDFLong <- attrDF %>%
   pivot_longer(cols = c(degree, betweenness), names_to = "measure", values_to = "value")
 ```
 
-View degree and betweenness over time
-
-```{r}
+```{r echo = FALSE}
 # Degree and betweenness over time
 attrDFLong %>%
   ggplot(aes(x = slice, y = value, col = label, group = label))+
@@ -99,23 +103,13 @@ attrDFLong %>%
   theme_minimal()+
   geom_vline(xintercept = burn.in+1, col = "red", size = 1)
 
-# This is still a little hard to see... let's look at just the "before" rows.
-attrDFLong %>%
-  filter(label %in% indivs, beforeAfter == "before") %>%
-  ggplot(aes(x = slice, y = value, col = label, group = label))+
-  facet_wrap(~measure, scales = "free")+
-  geom_line()+
-  theme_minimal()
-
 # Okay, I'm seeing some differentiation, but no clear patterns. Because of how the model is set up, the rank order tends to be maintained for a few consecutive time steps, but not over the whole span of the baseline model. This makes sense, since labels don't have any a priori reason to have higher or lower degrees than other labels.
 ```
 
-Now, going to compute three network-level measures before and after the removal of an label.
+## 3. For a single model run, examine network-level measures over time
 
-### 1. Network density deltas
-
-How does edge density behave over time?
-```{r}
+```{r echo = FALSE}
+# DENSITY
 densities <- lapply(modelGraphs, function(x){
   edge_density(x)
 }) %>% 
@@ -124,27 +118,7 @@ densities <- lapply(modelGraphs, function(x){
   setNames(., "density") %>%
   mutate(slice = 1:length(modelGraphs))
 
-densities %>%
-  ggplot(aes(x = slice, y = density))+
-  geom_line()+
-  theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
-```
-
-First delta: immediately before removal to after removal/pre-rewiring
-```{r}
-delta1_density <- igraph::edge_density(modelGraphs[[burn.in+1]])-igraph::edge_density(modelGraphs[[burn.in]])
-```
-
-Second delta: after removal/pre-rewiring to post-rewiring
-```{r}
-delta2_density <- igraph::edge_density(modelGraphs[[burn.in+2]])-igraph::edge_density(modelGraphs[[burn.in+1]])
-```
-
-### 2. Network connectivity (average path length) deltas
-
-How does connectivity behave over time?
-```{r}
+# CONNECTIVITY (MEAN DISTANCE)
 connectivities <- lapply(modelGraphs, function(x){
   mean_distance(x)
 }) %>% 
@@ -153,27 +127,7 @@ connectivities <- lapply(modelGraphs, function(x){
   setNames(., "connectivity") %>%
   mutate(slice = 1:length(modelGraphs))
 
-connectivities %>%
-  ggplot(aes(x = slice, y = connectivity))+
-  geom_line()+
-  theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
-```
-
-First delta: immediately before removal to after removal/pre-rewiring
-```{r}
-delta1_meanDistance <- igraph::mean_distance(modelGraphs[[burn.in+1]])-igraph::mean_distance(modelGraphs[[burn.in]])
-```
-
-Second delta: after removal/pre-rewiring to post-rewiring
-```{r}
-delta2_meanDistance <- igraph::mean_distance(modelGraphs[[burn.in+2]])-igraph::mean_distance(modelGraphs[[burn.in+1]])
-```
-
-### 3. Network modularity deltas
-
-How does modularity behave over time?
-```{r}
+# MODULARITY
 clustered <- lapply(modelGraphs, function(x){
   x %>%
     cluster_fast_greedy()
@@ -183,65 +137,106 @@ modularities <- data.frame(slice = 1:length(clustered),
                            modularity = unlist(lapply(clustered, modularity)),
                            nClusters = unlist(lapply(clustered, length)),
                            nIndivs = unlist(lapply(clustered, function(x){length(membership(x))})))
+```
+
+```{r echo = FALSE}
+# Set some colors we can use consistently throughout
+densColor <- "#151FC6"
+moduColor <- "#C61578"
+connColor <- "#C6BC15"
+
+# DENSITY
+densities %>%
+  ggplot(aes(x = slice, y = density))+
+  geom_line(col = densColor, size = 1)+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
+  ylab("Density")+
+  xlab("Time slice")
+
+connectivities %>%
+  ggplot(aes(x = slice, y = connectivity))+
+  geom_line(col = connColor, size = 1)+
+  theme_minimal()+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
+  ylab("Connectivity")+
+  xlab("Time slice")
 
 modularities %>%
   ggplot(aes(x = slice, y = modularity))+
-  geom_line()+
+  geom_line(col = moduColor, size = 1)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
+  ylab("Modularity")+
+  xlab("Time slice")
 
 modularities %>%
   ggplot(aes(x = slice, y = nClusters))+
-  geom_line()+
+  geom_line(col = moduColor, size = 1)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
-
-modularities %>%
-  ggplot(aes(x = slice, y = nClusters/modularity))+
-  geom_line()+
-  theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")
-# there doesn't seem to be a pattern in the ratio of nClusters to modularity, but I will investigate on a larger scale.
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
+  ylab("Number of clusters")+
+  xlab("Time slice")
 ```
 
+## 4. Exploring modularity
 
-Visually examine the clustering results to see if I see anything notable
-```{r}
-communities <- clustered[burn.in:(burn.in+2)]
-graphs <- modelGraphs[burn.in:(burn.in+2)]
+### a. How does `cluster_fast_greedy()` deal with isolated nodes?
 
-map2(.x = communities, .y = graphs, .f = function(.x, .y){
-  plot(.x, .y, vertex.size = 5)
-})
-
-```
-
-How does the clustering algorithm deal with isolated nodes?
-
-Well, we know that there are clusters of size 1. So it looks like isolated nodes are being included.
-
-What's the relationship between the number of isolated nodes vs. the number of clusters of size 1? In other words, how often, if ever, do we end up with a cluster of size 1 that is NOT an isolated node? I suspect that this graph is well-connected enough that this will never happen. I wonder under what conditions, if any, it would...
-
-```{r}
+```{r echo = FALSE}
 nIsolatedNodes <- lapply(modelGraphs, function(x){
   sum(degree(x) == 0)
-}) %>% unlist()
+}) %>% 
+  unlist()
 
-nSingletonClusters <- lapply(clustered, function(x){
-  sum(sizes(x) == 1)
-}) %>% unlist()
-
-plot(nSingletonClusters ~ nIsolatedNodes) # okay yeah, there's a perfect relationship between these. This tells us that there are no cases in which we get a cluster of size 1 that is NOT an isolated node.
+plot(nIsolatedNodes ~ c(1:length(nIsolatedNodes)), type = "l", ylab = "# isolated nodes", xlab = "Time slice")
 ```
 
-Let's examine what happens if we do the modularity calculations on networks with any isolated nodes removed!
+We can see from this plot that throughout the model, we have some isolated nodes.
+
+The question is, what does the clustering algorithm do to them?
+
+Well, we can also see that there are clusters of size 1:
+
+```{r echo = FALSE}
+nSingletonClusters <- lapply(clustered, function(x){
+  sum(sizes(x) == 1)
+}) %>% 
+  unlist()
+
+plot(nSingletonClusters ~ c(1:length(nSingletonClusters)), type = "l", ylab = "# clusters of size 1", xlab = "Time slice")
+```
+
+Indeed, there's a clear 1:1 relationship:
+
 ```{r}
+df <- data.frame(slice = 1:length(nIsolatedNodes),
+                 nIsolatedNodes = nIsolatedNodes,
+                 nSingletonClusters = nSingletonClusters)
+
+df %>%
+  ggplot(aes(x = nIsolatedNodes, y = nSingletonClusters))+
+  geom_point()+
+  geom_line()+
+  theme_minimal()
+```
+
+This means that isolated nodes are treated as their own clusters by the clustering algorithm.
+
+(Note: this also suggests that in this model, a connected node will never be its own cluster. I don't think I can conclude that this is true over the whole parameter space of this model. But it's true at least at these sizes of N and connection probabilities.)
+
+Okay, so, these isolated nodes could be affecting the modularity calculations. What if we compute modularity on networks with the isolated nodes removed?
+
+### b. Modularity when ignoring isolated nodes
+
+```{r echo = FALSE}
 noIso <- lapply(modelGraphs, function(x){
   g <- delete_vertices(x, which(degree(x) == 0))
 })
 ```
 
 How does modularity behave over time when we remove isolated nodes?
+
 ```{r warning = FALSE}
 clustered_noIso <- lapply(noIso, function(x){
   cluster_fast_greedy(x)
@@ -252,32 +247,29 @@ mods_noIso <- data.frame(slice = 1:length(clustered_noIso),
                          nClusters = unlist(lapply(clustered_noIso, length)),
                          nIndivs = unlist(lapply(clustered_noIso, function(x){length(membership(x))})))
 
-mods_noIso %>%
-  ggplot(aes(x = slice, y = modularity))+
-  geom_line()+
+allModularities <- bind_rows(modularities %>% mutate(allowIso = "Original networks"),
+                             mods_noIso %>% mutate(allowIso = "Isolated nodes removed"))
+
+allModularities %>%
+  ggplot(aes(x = slice, y = modularity, col = allowIso))+
+  geom_line(col = moduColor, size = 1)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 1, col = "red")+
-  ggtitle("modularity over time, without isolated nodes")
-```
-This may look exactly the same as the above graph. That's because when N is large, there are hardly any isolated nodes.
-
-First delta: immediately before removal to after removal/pre-rewiring
-```{r}
-delta1_modularity <- modularity(cluster_fast_greedy(modelGraphs[[burn.in+1]]))-modularity(cluster_fast_greedy(modelGraphs[[burn.in]]))
-delta1_modularity_noIso <- modularity(cluster_fast_greedy(noIso[[burn.in+1]]))-modularity(cluster_fast_greedy(noIso[[burn.in]]))
+  facet_wrap(~allowIso)+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
+  ylab("Modularity")+
+  xlab("Time slice")
 ```
 
-Second delta: after removal/pre-rewiring to post-rewiring
-```{r}
-delta2_modularity <- modularity(cluster_fast_greedy(modelGraphs[[burn.in+2]]))-modularity(cluster_fast_greedy(modelGraphs[[burn.in+1]]))
-delta2_modularity_noIso <- modularity(cluster_fast_greedy(noIso[[burn.in+2]]))-modularity(cluster_fast_greedy(noIso[[burn.in+1]]))
-```
+These graphs are exactly the same! It seems that isolated nodes are being treated as their own clusters, but they are not affecting the modularity calculation.
 
-## What should our measure be?
-I am not at all convinced that these momentary deltas are what I should be using. Seems like we need to at least consider two time steps out, since the model relies on this. Looking at the graphs above shows me how different the longer-term trends are from the short-term fluctuations.
+To understand this, I need to go back to the mathematical formula that is being used here. But I suspect it has something to do with 0's and 1's and the ratios between them all working out nicely. To discuss more with Noa.
 
-Let's run the model 100 times and see if trends emerge in how to measure.
-```{r}
+## 5. Trends for many model runs
+
+First, I run the model 100 times and compute the network measures for each of the model runs.
+
+```{r echo = FALSE}
+# Run 100 times, using the parameters defined at the very beginning of this document.
 nRuns <- 100
 modelRuns <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
@@ -300,8 +292,8 @@ for(i in 1:nRuns){
 }
 ```
 
-# Compute the three network-level measures for each of the model runs.
-```{r}
+```{r echo = FALSE}
+# Compute network-level measures for each model run
 densList <- lapply(modelRuns, function(x){
   lapply(x, function(y){
     edge_density(y)
@@ -335,85 +327,57 @@ moduList <- lapply(modelRuns, function(x){
 moduDF <- data.table::rbindlist(moduList, idcol = "run")
 ```
 
-Separate chunk for doing the calculations on the no-isolated-nodes graphs, so we don't unnecessarily suppress warnings for the other parts of the code.
-```{r warning = FALSE}
-modelRuns_noIso <- lapply(modelRuns, function(x){
-  lapply(x, function(y){
-    delete_vertices(y, which(degree(y) == 0))
-  })
-})
-moduList_noIso <- lapply(modelRuns, function(x){
-  noIso <- lapply(x, function(a){
-    delete_vertices(a, which(degree(a) == 0))
-  })
-  clustered <- lapply(noIso, cluster_fast_greedy)
-  df <- data.frame(slice = 1:length(clustered),
-                   modularity = unlist(lapply(clustered, modularity)),
-                   nClusters = unlist(lapply(clustered, length)),
-                   nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
-  return(df)
-})
-moduDF_noIso <- data.table::rbindlist(moduList_noIso, idcol = "run")
-```
+Now, I can make some plots to detect general trends in what happens to the network after removal/rewiring.
 
-Make some plots and try to detect any changepoint trends
 ```{r}
 densDF %>%
   ggplot(aes(x = slice, y = density))+
-  geom_line(aes(group = run, col = run), size = 0.1)+
+  geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
-  scale_color_viridis_c()
+  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  scale_color_viridis_c()+
+  ylab("Density")+
+  xlab("Time slice")
 
 connDF %>%
   ggplot(aes(x = slice, y = connectivity))+
-  geom_line(aes(group = run, col = run), size = 0.1)+
+  geom_line(aes(group = run), col = connColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
-  scale_color_viridis_c()
+  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  scale_color_viridis_c()+
+  ylab("Connectivity")+
+  xlab("Time slice")
 
 moduDF %>%
   ggplot(aes(x = slice, y = modularity))+
-  geom_line(aes(group = run, col = run), size = 0.1)+
+  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   scale_color_viridis_c() +
-  ggtitle("includes isolated nodes")
+  ylab("Modularity")+
+  xlab("Time slice")
 
-moduDF_noIso %>%
-  ggplot(aes(x = slice, y = modularity))+
-  geom_line(aes(group = run, col = run), size = 0.1)+
-  theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
-  scale_color_viridis_c()+
-  ggtitle("no isolated nodes")
-# This should look basically the same as the previous graph, since there are very few isolated nodes.
-```
-
-```{r}
 moduDF %>%
   filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nClusters))+
-  geom_line(aes(group = run, col = run), size = 0.1)+
+  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
-  scale_color_viridis_c()
-
-moduDF %>%
-  ggplot(aes(x = slice, y = modularity/nClusters))+
-  geom_line(aes(group = run, col = run), size = 0.1)+
-  theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, col = "red")+
-  scale_color_viridis_c()
-# Absolutely no pattern at all in the ratio of clusters to modularity.
+  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  scale_color_viridis_c()+
+  ylab("Number of clusters")+
+  xlab("Time slice")
 ```
 
-## 4. Relationship between removed node and network-level measures
+## 6. Relationship between removed node and network-level measures
 
-```{r}
+```{r echo = FALSE}
+# Prepare the data about removed nodes and network-level measures
+
+# NETWORK-LEVEL MEASURES
 networkLevel <- left_join(densDF, connDF, by = c("run", "slice")) %>%
   left_join(moduDF, by = c("run", "slice"))
 
+# NETWORK-LEVEL MEASURE DELTAS (before and after rewiring)
 deltas <- networkLevel %>%
   filter(slice %in% c(burn.in, burn.in+1, burn.in+2)) %>%
   group_by(run) %>%
@@ -428,7 +392,7 @@ deltas <- networkLevel %>%
          measure = stringr::str_remove(measure, "[0-9]")) %>%
   mutate(type = ifelse(type == 1, "Before rewiring", "After rewiring"))
   
-# Info about the removed node
+# INFO ABOUT THE REMOVED NODE
 removedInfo <- lapply(modelRuns, function(x){
   init <- V(x[[1]])$name
   final <- V(x[[length(x)]])$name
@@ -444,7 +408,7 @@ removedInfo <- lapply(modelRuns, function(x){
   data.table::rbindlist(idcol = "run") %>%
   as.data.frame()
 
-# Combine individual-level and network-level info so we can compare them
+# COMBINE INDIVIDUAL AND NETWORK MEASURES
 full <- removedInfo %>%
   left_join(deltas, by = "run") %>%
   mutate(label = case_when(measure == "modu" ~ "\u0394 Modularity",
@@ -453,8 +417,9 @@ full <- removedInfo %>%
                            TRUE ~ NA_character_))
 ```
 
-Okay, now that the data is prepared, let's graph it!
-```{r}
+First, let's check whether degree and betweenness are indeed highly correlated. We suspect that they are.
+
+```{r echo = FALSE}
 # Degree and betweenness are probably highly correlated. Let's check.
 removedInfo %>%
   ggplot(aes(x = degree, y = btwn))+
@@ -464,19 +429,26 @@ removedInfo %>%
   ylab("Betweenness")+
   xlab("Degree")
 ```
+Indeed, these are highly correlated. Expect similar effects.
 
-They are indeed highly correlated. So we should expect very similar effects...
-```{r}
+```{r echo = FALSE}
+# Set some common plot elements
+plotElements = list(geom_point(shape = 1),
+             geom_smooth(method = "lm", aes(col = label)),
+             scale_color_manual(values = c(connColor, densColor, moduColor)),
+             facet_wrap(~label, scales = "free", strip.position = "left"),
+             theme_minimal(),
+             theme(strip.placement = "outside",
+                   legend.position = "none",
+                   axis.title.x = element_text(size = 11),
+                   strip.text.y = element_text(size = 11)),
+             ylab(""))
+
 # DEGREE VS. DELTA 1
 full %>%
   filter(type == "Before rewiring") %>%
   ggplot(aes(x = degree, y = value))+
-  geom_point(shape = 1)+
-  geom_smooth(method = "lm", col = "blue")+
-  facet_wrap(~label, scales = "free", strip.position = "left")+
-  theme_minimal()+
-  theme(strip.placement = "outside")+
-  ylab("")+
+  plotElements+
   xlab("Degree of removed node")+
   ggtitle("Before rewiring")
   
@@ -484,12 +456,7 @@ full %>%
 full %>%
   filter(type == "After rewiring") %>%
   ggplot(aes(x = degree, y = value))+
-  geom_point(shape = 1)+
-  geom_smooth(method = "lm", col = "red")+
-  facet_wrap(~label, scales = "free", strip.position = "left")+
-  theme_minimal()+
-  theme(strip.placement = "outside")+
-  ylab("")+
+  plotElements+
   xlab("Degree of removed node")+
   ggtitle("After rewiring")
 
@@ -497,12 +464,7 @@ full %>%
 full %>%
   filter(type == "Before rewiring") %>%
   ggplot(aes(x = btwn, y = value))+
-  geom_point(shape = 1)+
-  geom_smooth(method = "lm", col = "blue")+
-  facet_wrap(~label, scales = "free", strip.position = "left")+
-  theme_minimal()+
-  theme(strip.placement = "outside")+
-  ylab("")+
+  plotElements+
   xlab("Betweenness of removed node")+
   ggtitle("Before rewiring")
   
@@ -510,93 +472,66 @@ full %>%
 full %>%
   filter(type == "After rewiring") %>%
   ggplot(aes(x = btwn, y = value))+
-  geom_point(shape = 1)+
-  geom_smooth(method = "lm", col = "red")+
-  facet_wrap(~label, scales = "free", strip.position = "left")+
-  theme_minimal()+
-  theme(strip.placement = "outside")+
-  ylab("")+
+  plotElements+
   xlab("Betweenness of removed node")+
   ggtitle("After rewiring")
 
 ```
 
-What about the ratio between the first and second changes? Aka: what percentage of the loss/gain is recovered by the rewiring? Should be delta2/delta1.
+What about the ratio between the first and second changes? Aka: what percentage of the loss/gain is recovered by the rewiring?
 
-```{r}
+```{r echo = FALSE, message = FALSE}
+# Create the ratios data to use for these plots
 deltaRatios <- full %>%
   group_by(run, name, number, degree, btwn, measure, label) %>%
   summarize(ratio = value[2]/value[1],
-            absRatio = abs(ratio))
+            absRatio = abs(ratio)) %>%
+  mutate(measure = case_when(measure == "modu" ~ "Modularity",
+                             measure == "dens" ~ "Density",
+                             measure == "conn" ~ "Connectivity",
+                             TRUE ~ NA_character_))
 
 # Remove any that are too huge (above 200)
 deltaRatios <- deltaRatios %>%
   filter(ratio < 200)
 
+# Set some common plot elements
+plotElements = list(geom_point(shape = 1),
+             geom_smooth(method = "lm", aes(col = label)),
+             scale_color_manual(values = c(connColor, densColor, moduColor)),
+             facet_wrap(~measure, scales = "free", strip.position = "left"),
+             theme_minimal(),
+             theme(strip.placement = "outside",
+                   legend.position = "none",
+                   axis.title.x = element_text(size = 14),
+                   strip.text.y = element_text(size = 14)),
+             ylab(""))
+
 # DEGREE VS. DELTA RATIO
 deltaRatios %>%
-  mutate(measure = case_when(measure == "modu" ~ "Modularity",
-                             measure == "dens" ~ "Density",
-                             measure == "conn" ~ "Connectivity",
-                             TRUE ~ NA_character_)) %>%
   ggplot(aes(x = degree, y = ratio))+
-  geom_point(shape = 1)+
-  geom_smooth(method = "lm", col = "blue")+
-  facet_wrap(~measure, scales = "free", strip.position = "left")+
-  theme_minimal()+
-  theme(strip.placement = "outside")+
-  ylab("")+
+  plotElements+
   xlab("Degree of removed node")+
-  ggtitle("Ratio of \u0394 after rewiring to \u0394 before rewiring")
+  ggtitle("\u0394after / \u0394before")
 
 # DEGREE VS. abs(DELTA RATIO)
 deltaRatios %>%
-  mutate(measure = case_when(measure == "modu" ~ "Modularity",
-                             measure == "dens" ~ "Density",
-                             measure == "conn" ~ "Connectivity",
-                             TRUE ~ NA_character_)) %>%
   ggplot(aes(x = degree, y = absRatio))+
-  geom_point(shape = 1)+
-  geom_smooth(method = "lm", col = "blue")+
-  facet_wrap(~measure, scales = "free", strip.position = "left")+
-  theme_minimal()+
-  theme(strip.placement = "outside")+
-  ylab("")+
+  plotElements+
   xlab("Degree of removed node")+
-  ggtitle("|Ratio of \u0394 after rewiring to \u0394 before rewiring|")
+  ggtitle("abs(\u0394after / \u0394before)")
 
 # BTWN VS. DELTA RATIO
 deltaRatios %>%
-  mutate(measure = case_when(measure == "modu" ~ "Modularity",
-                             measure == "dens" ~ "Density",
-                             measure == "conn" ~ "Connectivity",
-                             TRUE ~ NA_character_)) %>%
   ggplot(aes(x = btwn, y = ratio))+
-  geom_point(shape = 1)+
-  geom_smooth(method = "lm", col = "blue")+
-  facet_wrap(~measure, scales = "free", strip.position = "left")+
-  theme_minimal()+
-  theme(strip.placement = "outside")+
-  ylab("")+
+  plotElements+
   xlab("Betweenness of removed node")+
-  ggtitle("Ratio of \u0394 after rewiring to \u0394 before rewiring")
+  ggtitle("\u0394after / \u0394before")
 
 # BTWN VS. abs(DELTA RATIO)
 deltaRatios %>%
-  mutate(measure = case_when(measure == "modu" ~ "Modularity",
-                             measure == "dens" ~ "Density",
-                             measure == "conn" ~ "Connectivity",
-                             TRUE ~ NA_character_)) %>%
   ggplot(aes(x = btwn, y = absRatio))+
-  geom_point(shape = 1)+
-  geom_smooth(method = "lm", col = "blue")+
-  facet_wrap(~measure, scales = "free", strip.position = "left")+
-  theme_minimal()+
-  theme(strip.placement = "outside")+
-  ylab("")+
+  plotElements+
   xlab("Betweenness of removed node")+
-  ggtitle("|Ratio of \u0394 after rewiring to \u0394 before rewiring|")
+  ggtitle("abs(\u0394after / \u0394before)")
 ```
-
-
-
