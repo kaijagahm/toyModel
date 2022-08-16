@@ -429,7 +429,8 @@ removedInfo %>%
   ylab("Betweenness")+
   xlab("Degree")
 ```
-Indeed, these are highly correlated. Expect similar effects.
+
+Indeed, these are highly correlated. I'm not going to make graphs for betweenness, just degree.
 
 ```{r echo = FALSE}
 # Set some common plot elements
@@ -446,36 +447,21 @@ plotElements = list(geom_point(shape = 1),
 
 # DEGREE VS. DELTA 1
 full %>%
+  mutate(label = paste0("|", label, "|")) %>%
   filter(type == "Before rewiring") %>%
   ggplot(aes(x = degree, y = abs(value)))+
   plotElements+
   xlab("Degree of removed node")+
-  ggtitle("Before rewiring")
+  ggtitle("Change")
   
 # DEGREE VS. DELTA 2
 full %>%
+  mutate(label = paste0("|", label, "|")) %>%
   filter(type == "After rewiring") %>%
   ggplot(aes(x = degree, y = abs(value)))+
   plotElements+
   xlab("Degree of removed node")+
-  ggtitle("After rewiring")
-
-# BTWN VS. DELTA 1
-full %>%
-  filter(type == "Before rewiring") %>%
-  ggplot(aes(x = btwn, y = abs(value)))+
-  plotElements+
-  xlab("Betweenness of removed node")+
-  ggtitle("Before rewiring")
-  
-# BTWN VS. DELTA 2
-full %>%
-  filter(type == "After rewiring") %>%
-  ggplot(aes(x = btwn, y = abs(value)))+
-  plotElements+
-  xlab("Betweenness of removed node")+
-  ggtitle("After rewiring")
-
+  ggtitle("Recovery")
 ```
 
 What about the ratio between the first and second changes? Aka: what percentage of the loss/gain is recovered by the rewiring?
@@ -512,26 +498,12 @@ deltaRatios %>%
   ggplot(aes(x = degree, y = ratio))+
   plotElements+
   xlab("Degree of removed node")+
-  ggtitle("\u0394after / \u0394before")
+  ggtitle("Change/Recovery")
 
 # DEGREE VS. abs(DELTA RATIO)
 deltaRatios %>%
   ggplot(aes(x = degree, y = absRatio))+
   plotElements+
   xlab("Degree of removed node")+
-  ggtitle("abs(\u0394after / \u0394before)")
-
-# BTWN VS. DELTA RATIO
-deltaRatios %>%
-  ggplot(aes(x = btwn, y = ratio))+
-  plotElements+
-  xlab("Betweenness of removed node")+
-  ggtitle("\u0394after / \u0394before")
-
-# BTWN VS. abs(DELTA RATIO)
-deltaRatios %>%
-  ggplot(aes(x = btwn, y = absRatio))+
-  plotElements+
-  xlab("Betweenness of removed node")+
-  ggtitle("abs(\u0394after / \u0394before)")
+  ggtitle("|Change/Recovery|")
 ```
