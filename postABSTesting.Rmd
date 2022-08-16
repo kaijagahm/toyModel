@@ -271,102 +271,187 @@ First, I run the model 100 times and compute the network measures for each of th
 ```{r echo = FALSE}
 # Run 100 times, using the parameters defined at the very beginning of this document.
 nRuns <- 100
-modelRuns <- vector(mode = "list", length = nRuns)
+modelRuns50 <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
-  modelRuns[[i]] <- runModel(N = N, # Nodes in the network
-                             edge.prob = edge.prob, 
-                             burn.in = burn.in,
-                             burn.out = burn.out,
-                             pm = pm,
-                             ps = ps, 
-                             pa = pa,
-                             add00 = add00, 
-                             lose01 = lose01, 
-                             add10 = add10,
-                             lose11 = lose11, 
-                             histMultiplier = histMultiplier,
-                             doRemoval = doRemoval) %>%
+  modelRuns50[[i]] <- runModel(N = N, # Nodes in the network
+                               edge.prob = edge.prob, 
+                               burn.in = burn.in,
+                               burn.out = burn.out,
+                               pm = pm,
+                               ps = ps, 
+                               pa = pa,
+                               add00 = add00, 
+                               lose01 = lose01, 
+                               add10 = add10,
+                               lose11 = lose11, 
+                               histMultiplier = histMultiplier,
+                               doRemoval = doRemoval) %>%
     lapply(., function(x){
       igraph::graph_from_adjacency_matrix(x, mode = "undirected")
     })
 }
+
+modelRuns25 <- vector(mode = "list", length = nRuns)
+for(i in 1:nRuns){
+  modelRuns25[[i]] <- runModel(N = 25, # Nodes in the network
+                               edge.prob = edge.prob, 
+                               burn.in = burn.in,
+                               burn.out = burn.out,
+                               pm = pm,
+                               ps = ps, 
+                               pa = pa,
+                               add00 = add00, 
+                               lose01 = lose01, 
+                               add10 = add10,
+                               lose11 = lose11, 
+                               histMultiplier = histMultiplier,
+                               doRemoval = doRemoval) %>%
+    lapply(., function(x){
+      igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+    })
+}
+
+modelRuns75 <- vector(mode = "list", length = nRuns)
+for(i in 1:nRuns){
+  modelRuns75[[i]] <- runModel(N = 75, # Nodes in the network
+                               edge.prob = edge.prob, 
+                               burn.in = burn.in,
+                               burn.out = burn.out,
+                               pm = pm,
+                               ps = ps, 
+                               pa = pa,
+                               add00 = add00, 
+                               lose01 = lose01, 
+                               add10 = add10,
+                               lose11 = lose11, 
+                               histMultiplier = histMultiplier,
+                               doRemoval = doRemoval) %>%
+    lapply(., function(x){
+      igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+    })
+}
+
+modelRuns100 <- vector(mode = "list", length = nRuns)
+for(i in 1:nRuns){
+  modelRuns100[[i]] <- runModel(N = 100, # Nodes in the network
+                                edge.prob = edge.prob, 
+                                burn.in = burn.in,
+                                burn.out = burn.out,
+                                pm = pm,
+                                ps = ps, 
+                                pa = pa,
+                                add00 = add00, 
+                                lose01 = lose01, 
+                                add10 = add10,
+                                lose11 = lose11, 
+                                histMultiplier = histMultiplier,
+                                doRemoval = doRemoval) %>%
+    lapply(., function(x){
+      igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+    })
+}
+
+modelRunsList <- list(modelRuns25, modelRuns50, modelRuns75, modelRuns100)
 ```
 
 ```{r echo = FALSE}
 # Compute network-level measures for each model run
-densList <- lapply(modelRuns, function(x){
-  lapply(x, function(y){
-    edge_density(y)
-  }) %>%
-    unlist() %>%
-    as.data.frame() %>%
-    setNames(., "density") %>%
-    mutate(slice = 1:nrow(.))
-})
-densDF <- data.table::rbindlist(densList, idcol = "run")
+ns <- c(25, 50, 75, 100)
+dens <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
+  densList <- lapply(.x, function(x){
+    lapply(x, function(y){
+      edge_density(y)
+    }) %>%
+      unlist() %>%
+      as.data.frame() %>%
+      setNames(., "density") %>%
+      mutate(slice = 1:nrow(.))
+  })
+  densDF <- data.table::rbindlist(densList, idcol = "run") %>%
+    mutate(N = .y)
+}) %>%
+  data.table::rbindlist()
 
-mdList <- lapply(modelRuns, function(x){
-  lapply(x, function(y){
-    mean_distance(y)
-  }) %>%
-    unlist() %>%
-    as.data.frame() %>%
-    setNames(., "meanDistance") %>%
-    mutate(slice = 1:nrow(.))
-})
-mdDF <- data.table::rbindlist(mdList, idcol = "run")
+md <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
+  densList <- lapply(.x, function(x){
+    lapply(x, function(y){
+      mean_distance(y)
+    }) %>%
+      unlist() %>%
+      as.data.frame() %>%
+      setNames(., "meanDistance") %>%
+      mutate(slice = 1:nrow(.))
+  })
+  densDF <- data.table::rbindlist(densList, idcol = "run") %>%
+    mutate(N = .y)
+}) %>%
+  data.table::rbindlist()
 
-moduList <- lapply(modelRuns, function(x){
-  clustered <- lapply(x, cluster_fast_greedy)
-  df <- data.frame(slice = 1:length(clustered),
-                   modularity = unlist(lapply(clustered, modularity)),
-                   nClusters = unlist(lapply(clustered, length)),
-                   nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
-  return(df)
-})
-moduDF <- data.table::rbindlist(moduList, idcol = "run")
+modu <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
+  moduList <- lapply(.x, function(x){
+    clustered <- lapply(x, cluster_fast_greedy)
+    df <- data.frame(slice = 1:length(clustered),
+                     modularity = unlist(lapply(clustered, modularity)),
+                     nClusters = unlist(lapply(clustered, length)),
+                     nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
+    return(df)
+  })
+  moduDF <- data.table::rbindlist(moduList, idcol = "run") %>%
+    mutate(N = .y)
+}) %>%
+  data.table::rbindlist()
 ```
 
 Now, I can make some plots to detect general trends in what happens to the network after removal/rewiring.
 
-```{r}
-densDF %>%
+```{r echo = FALSE}
+dens %>%
   ggplot(aes(x = slice, y = density))+
   geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
-  scale_color_viridis_c()+
+  facet_wrap(~N)+
   ylab("Density")+
   xlab("Time slice")
+```
 
-mdDF %>%
+Density behaves the same no matter the number of individuals in the network, just with less variation. To be expected.
+
+```{r echo = FALSE}
+md %>%
   ggplot(aes(x = slice, y = meanDistance))+
   geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
-  scale_color_viridis_c()+
+  facet_wrap(~N)+
   ylab("Mean Distance")+
   xlab("Time slice")
+```
 
-moduDF %>%
+Mean distance looks like it might have a nonlinear relationship with the number of individuals in the network. Need to investigate this further!
+
+```{r echo = FALSE}
+modu %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
-  scale_color_viridis_c() +
+  facet_wrap(~N)+
   ylab("Modularity")+
   xlab("Time slice")
 
-moduDF %>%
+modu %>%
   filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nClusters))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
-  scale_color_viridis_c()+
+  facet_wrap(~N)+
   ylab("Number of clusters")+
   xlab("Time slice")
 ```
+
+Modularity seems to behave the same no matter the number of individuals in the network.
 
 ## 6. Relationship between removed node and network-level measures
 
@@ -391,9 +476,9 @@ deltas <- networkLevel %>%
   mutate(type = stringr::str_extract(measure, "[0-9]"),
          measure = stringr::str_remove(measure, "[0-9]")) %>%
   mutate(type = ifelse(type == 1, "Before rewiring", "After rewiring"))
-  
+
 # INFO ABOUT THE REMOVED NODE
-removedInfo <- lapply(modelRuns, function(x){
+removedInfo <- lapply(modelRuns50, function(x){
   init <- V(x[[1]])$name
   final <- V(x[[length(x)]])$name
   removedNumber <- which(!(init %in% final))
@@ -435,15 +520,15 @@ Indeed, these are highly correlated. I'm not going to make graphs for betweennes
 ```{r echo = FALSE}
 # Set some common plot elements
 plotElements = list(geom_point(shape = 1),
-             geom_smooth(method = "lm", aes(col = label)),
-             scale_color_manual(values = c(mdColor, densColor, moduColor)),
-             facet_wrap(~label, scales = "free", strip.position = "left"),
-             theme_minimal(),
-             theme(strip.placement = "outside",
-                   legend.position = "none",
-                   axis.title.x = element_text(size = 11),
-                   strip.text.y = element_text(size = 11)),
-             ylab(""))
+                    geom_smooth(method = "lm", aes(col = label)),
+                    scale_color_manual(values = c(mdColor, densColor, moduColor)),
+                    facet_wrap(~label, scales = "free", strip.position = "left"),
+                    theme_minimal(),
+                    theme(strip.placement = "outside",
+                          legend.position = "none",
+                          axis.title.x = element_text(size = 11),
+                          strip.text.y = element_text(size = 11)),
+                    ylab(""))
 
 # DEGREE VS. DELTA 1
 full %>%
@@ -453,7 +538,7 @@ full %>%
   plotElements+
   xlab("Degree of removed node")+
   ggtitle("Change")
-  
+
 # DEGREE VS. DELTA 2
 full %>%
   mutate(label = paste0("|", label, "|")) %>%
@@ -483,15 +568,15 @@ deltaRatios <- deltaRatios %>%
 
 # Set some common plot elements
 plotElements = list(geom_point(shape = 1),
-             geom_smooth(method = "lm", aes(col = label)),
-             scale_color_manual(values = c(mdColor, densColor, moduColor)),
-             facet_wrap(~measure, scales = "free", strip.position = "left"),
-             theme_minimal(),
-             theme(strip.placement = "outside",
-                   legend.position = "none",
-                   axis.title.x = element_text(size = 14),
-                   strip.text.y = element_text(size = 14)),
-             ylab(""))
+                    geom_smooth(method = "lm", aes(col = label)),
+                    scale_color_manual(values = c(mdColor, densColor, moduColor)),
+                    facet_wrap(~measure, scales = "free", strip.position = "left"),
+                    theme_minimal(),
+                    theme(strip.placement = "outside",
+                          legend.position = "none",
+                          axis.title.x = element_text(size = 14),
+                          strip.text.y = element_text(size = 14)),
+                    ylab(""))
 
 # DEGREE VS. DELTA RATIO
 deltaRatios %>%
