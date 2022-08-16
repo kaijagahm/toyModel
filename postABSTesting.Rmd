@@ -118,13 +118,13 @@ densities <- lapply(modelGraphs, function(x){
   setNames(., "density") %>%
   mutate(slice = 1:length(modelGraphs))
 
-# CONNECTIVITY (MEAN DISTANCE)
-connectivities <- lapply(modelGraphs, function(x){
+# Mean distance
+meanDistances <- lapply(modelGraphs, function(x){
   mean_distance(x)
 }) %>% 
   unlist() %>% 
   as.data.frame() %>%
-  setNames(., "connectivity") %>%
+  setNames(., "meanDistance") %>%
   mutate(slice = 1:length(modelGraphs))
 
 # MODULARITY
@@ -143,7 +143,7 @@ modularities <- data.frame(slice = 1:length(clustered),
 # Set some colors we can use consistently throughout
 densColor <- "#151FC6"
 moduColor <- "#C61578"
-connColor <- "#C6BC15"
+mdColor <- "#C6BC15"
 
 # DENSITY
 densities %>%
@@ -154,12 +154,12 @@ densities %>%
   ylab("Density")+
   xlab("Time slice")
 
-connectivities %>%
-  ggplot(aes(x = slice, y = connectivity))+
-  geom_line(col = connColor, size = 1)+
+meanDistances %>%
+  ggplot(aes(x = slice, y = meanDistance))+
+  geom_line(col = mdColor, size = 1)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
-  ylab("Connectivity")+
+  ylab("Mean Distance")+
   xlab("Time slice")
 
 modularities %>%
@@ -305,16 +305,16 @@ densList <- lapply(modelRuns, function(x){
 })
 densDF <- data.table::rbindlist(densList, idcol = "run")
 
-connList <- lapply(modelRuns, function(x){
+mdList <- lapply(modelRuns, function(x){
   lapply(x, function(y){
     mean_distance(y)
   }) %>%
     unlist() %>%
     as.data.frame() %>%
-    setNames(., "connectivity") %>%
+    setNames(., "meanDistance") %>%
     mutate(slice = 1:nrow(.))
 })
-connDF <- data.table::rbindlist(connList, idcol = "run")
+mdDF <- data.table::rbindlist(mdList, idcol = "run")
 
 moduList <- lapply(modelRuns, function(x){
   clustered <- lapply(x, cluster_fast_greedy)
@@ -339,13 +339,13 @@ densDF %>%
   ylab("Density")+
   xlab("Time slice")
 
-connDF %>%
-  ggplot(aes(x = slice, y = connectivity))+
-  geom_line(aes(group = run), col = connColor, size = 0.2, alpha = 0.5)+
+mdDF %>%
+  ggplot(aes(x = slice, y = meanDistance))+
+  geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   scale_color_viridis_c()+
-  ylab("Connectivity")+
+  ylab("Mean Distance")+
   xlab("Time slice")
 
 moduDF %>%
@@ -374,7 +374,7 @@ moduDF %>%
 # Prepare the data about removed nodes and network-level measures
 
 # NETWORK-LEVEL MEASURES
-networkLevel <- left_join(densDF, connDF, by = c("run", "slice")) %>%
+networkLevel <- left_join(densDF, mdDF, by = c("run", "slice")) %>%
   left_join(moduDF, by = c("run", "slice"))
 
 # NETWORK-LEVEL MEASURE DELTAS (before and after rewiring)
@@ -383,8 +383,8 @@ deltas <- networkLevel %>%
   group_by(run) %>%
   summarize(dens1 = density[2]-density[1],
             dens2 = density[3]-density[2],
-            conn1 = connectivity[2]-connectivity[1],
-            conn2 = connectivity[3]-connectivity[2],
+            md1 = meanDistance[2]-meanDistance[1],
+            md2 = meanDistance[3]-meanDistance[2],
             modu1 = modularity[2]-modularity[1],
             modu2 = modularity[3]-modularity[2]) %>%
   pivot_longer(cols = -run, names_to = "measure", values_to = "value") %>%
@@ -412,7 +412,7 @@ removedInfo <- lapply(modelRuns, function(x){
 full <- removedInfo %>%
   left_join(deltas, by = "run") %>%
   mutate(label = case_when(measure == "modu" ~ "\u0394 Modularity",
-                           measure == "conn" ~ "\u0394 Connectivity (mean distance)",
+                           measure == "md" ~ "\u0394 Mean Distance",
                            measure == "dens" ~ "\u0394 Edge Density",
                            TRUE ~ NA_character_))
 ```
@@ -435,7 +435,7 @@ Indeed, these are highly correlated. Expect similar effects.
 # Set some common plot elements
 plotElements = list(geom_point(shape = 1),
              geom_smooth(method = "lm", aes(col = label)),
-             scale_color_manual(values = c(connColor, densColor, moduColor)),
+             scale_color_manual(values = c(mdColor, densColor, moduColor)),
              facet_wrap(~label, scales = "free", strip.position = "left"),
              theme_minimal(),
              theme(strip.placement = "outside",
@@ -447,7 +447,7 @@ plotElements = list(geom_point(shape = 1),
 # DEGREE VS. DELTA 1
 full %>%
   filter(type == "Before rewiring") %>%
-  ggplot(aes(x = degree, y = value))+
+  ggplot(aes(x = degree, y = abs(value)))+
   plotElements+
   xlab("Degree of removed node")+
   ggtitle("Before rewiring")
@@ -455,7 +455,7 @@ full %>%
 # DEGREE VS. DELTA 2
 full %>%
   filter(type == "After rewiring") %>%
-  ggplot(aes(x = degree, y = value))+
+  ggplot(aes(x = degree, y = abs(value)))+
   plotElements+
   xlab("Degree of removed node")+
   ggtitle("After rewiring")
@@ -463,7 +463,7 @@ full %>%
 # BTWN VS. DELTA 1
 full %>%
   filter(type == "Before rewiring") %>%
-  ggplot(aes(x = btwn, y = value))+
+  ggplot(aes(x = btwn, y = abs(value)))+
   plotElements+
   xlab("Betweenness of removed node")+
   ggtitle("Before rewiring")
@@ -471,7 +471,7 @@ full %>%
 # BTWN VS. DELTA 2
 full %>%
   filter(type == "After rewiring") %>%
-  ggplot(aes(x = btwn, y = value))+
+  ggplot(aes(x = btwn, y = abs(value)))+
   plotElements+
   xlab("Betweenness of removed node")+
   ggtitle("After rewiring")
@@ -488,7 +488,7 @@ deltaRatios <- full %>%
             absRatio = abs(ratio)) %>%
   mutate(measure = case_when(measure == "modu" ~ "Modularity",
                              measure == "dens" ~ "Density",
-                             measure == "conn" ~ "Connectivity",
+                             measure == "md" ~ "Mean Distance",
                              TRUE ~ NA_character_))
 
 # Remove any that are too huge (above 200)
@@ -498,7 +498,7 @@ deltaRatios <- deltaRatios %>%
 # Set some common plot elements
 plotElements = list(geom_point(shape = 1),
              geom_smooth(method = "lm", aes(col = label)),
-             scale_color_manual(values = c(connColor, densColor, moduColor)),
+             scale_color_manual(values = c(mdColor, densColor, moduColor)),
              facet_wrap(~measure, scales = "free", strip.position = "left"),
              theme_minimal(),
              theme(strip.placement = "outside",
