@@ -1,0 +1,22 @@
+---
+title: "Final Report"
+author: "Kaija Gahm"
+date: "2022-08-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## 1. Statement of problem you're studying. In one clear sentence, what question do you hope to answer?
+
+## 2. Brief description of your model. Describe and justify your decisions with respect to choice of state variables, discrete or continuous time, deterministic or stochastic, spatial (or other) structure, etc.
+
+## 3. Diagram and model equations for your base model, and for any extensions you are actively working on. (No need to list all the ideas that you probably won’t have time to pursue in the next few weeks.)
+
+## 4. R code for your base model. This doesn't have to include all the bells and whistles, but we want to see that you have the core model working. (It can be sent in a separate file, or you can do it all in markdown if you want.)
+
+## 5. Basic results from your R code, which begin to address your central question (or at least, show the type of analysis you'd like to do to address your question). The results should be sensible, even if they're not fully refined yet. Show one or more plots with model output, and write a basic interpretation that explains why the results make sense. (Or highlight any puzzles you can’t crack.) Show how far you've gotten and relate it to your goals.
+
+## 6. Plans for your analysis. Summarize where you stand, and what your plans are to address your research question. In particular: what specific model outputs will you use to characterize your system’s behavior? What model inputs will you vary to explore your central question? What relationships will you explore via sensitivity/uncertainty analysis, and how will you display them? What do you plan to accomplish in the remainder of the course? Are there extra features you need to add to the model? Are there specific technical challenges you face?
