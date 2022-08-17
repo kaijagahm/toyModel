@@ -44,7 +44,7 @@ runModel <- function(N = 50, # Nodes in the network
     
     if(doRemoval == TRUE){
       # Removal/perturbation and rewiring
-      rewired.list <- remove.network.node(network = network.history[[burn.in]], 
+      rewired.list <- remove.network.nodes(network = network.history[[burn.in]], 
                                           previous = network.history[[burn.in-1]],
                                           histMultiplier = histMultiplier,
                                           n.removed = 1, pm = rnorm(1, pm), 

@@ -88,7 +88,7 @@ update.network <- function(ind, # starting index for the history list.
                      prob = lose01)
   new[h10] <- rbinom(n = nrow(h10), size = 1,
                      prob = add10)
-
+  
   # Symmetrize the matrix
   new <- as.matrix(sna::symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
   
@@ -96,9 +96,9 @@ update.network <- function(ind, # starting index for the history list.
 }
 
 
-# remove.network.node -----------------------------------------------------
+# remove.network.nodes -----------------------------------------------------
 # Function to remove a node from the network.
-remove.network.node <- function(network, previous, n.removed = 1, id = NULL, 
+remove.network.nodes <- function(network, previous, n.removed = 1, id = NULL, 
                                 pm, # both bereaved 
                                 ps, # one bereaved, one not
                                 pa, # neither bereaved
@@ -114,11 +114,22 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
   }
   
   # First, capture the edges involving the removed individual
-  edges <- network[del, ] # row ([del,]), excluding self col ([,-del])
-  edges[del] <- NA
+  edges <- network[del,] # row ([del,]), excluding self col ([,-del])
+  if(n.removed == 1){ # if we only removed one individual, `edges` is a vector. Have to convert it back to a matrix.
+    edges <- matrix(edges, nrow = 1, byrow = TRUE)
+  } # if we removed more than one individual, `edges` is already a matrix.
+  
+  # set self edges to NA
+  edges[,del] <- NA
+  
+  # Calculate extent of bereavement--how many friends did each individual lose?
+  friendsLost <- colSums(edges)
+  
+  
+  
   bereaved <- which(edges == 1) # nodes that were connected to the removed individual
   non.bereaved <- which(edges == 0)
-
+  
   # Remove the node (set row and column to NA)
   network[del,] <- NA # rows 
   network[,del] <- NA # columns
@@ -135,7 +146,7 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
   # then allocate a new edge vs not
   if(length(potentials) > 0){
     potentials <- dedup(potentials, triangle = "upper") # only the upper triangle
-
+    
     # for each edge, decide whether it forms or not (0 or 1)
     probs <- abs(rnorm(nrow(potentials), mean = pm, sd = 0.1))
     multiply <- previous[bereaved, bereaved][potentials]*histMultiplier
@@ -143,7 +154,7 @@ remove.network.node <- function(network, previous, n.removed = 1, id = NULL,
     probs.adjusted[probs.adjusted > 1] <- 1
     probs.adjusted[probs.adjusted < 0] <- 0
     new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
-
+    
     # update the network
     network[bereaved, bereaved][potentials] <- new.edge # update edges between bereaved with either a 0 or a 1
     network <- sna::symmetrize(network, rule = "upper") # copy upper triangle
