@@ -122,18 +122,26 @@ remove.network.nodes <- function(network, previous, n.removed = 1, id = NULL,
   # set self edges to NA
   edges[,del] <- NA
   
-  # Calculate extent of bereavement--how many friends did each individual lose?
-  friendsLost <- colSums(edges)
-  
-  
-  
-  bereaved <- which(edges == 1) # nodes that were connected to the removed individual
-  non.bereaved <- which(edges == 0)
-  
   # Remove the node (set row and column to NA)
   network[del,] <- NA # rows 
   network[,del] <- NA # columns
   N <- N-1 # update the population size.
+  
+  # Calculate extent of bereavement--how many friends did each individual lose?
+  nFriendsLost <- colSums(edges)
+  nFriendsHad <- colSums(previous) # how many friends they had
+  propFriendsLost <- nFriendsLost/nFriendsHad
+  propFriendsLost[is.nan(propFriendsLost)] <- 0
+  
+  
+
+  # Now it's time to update the network.
+  # First we create a data frame of all the new edges and their current and past two states.
+  # Calculate probability of new edge forming or old edge being lost according to the baseline probabilities of the network.
+  # Can define two coefficients:
+    # `connectModifier` is the extent to which increasing bereavement makes an individual more likely to connect with others. If connectModifier is 1, then losing 4 friends makes an individual 4x more likely to make a new connection than it would be if it hadn't lost any friends. If connectModifier is 0.5, then losing 4 friends makes an individual 2x more likely to make a new connection than it would be if it hadn't lost any friends. If connectModifier is 0, then losing friends has no effect on the individual's tendency to form new connections.
+      # Because of the 0, we're going to have to multiply the existing probability by `1+connectModifier*nLostFriends`
+    # `maintainModifier` is the extent to which increasing bereavement makes an individual more likely to maintain its existing connections. 
   
   # Now update the network.
   # First, allocate edges between mutually bereaved nodes (2nd-degree rewiring)
