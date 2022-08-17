@@ -75,8 +75,7 @@ update.network <- function(ind, # starting index for the history list.
   h01 <- dedup(which(prevprev < prev, arr.ind = T), "upper")
   h10 <- dedup(which(prevprev > prev, arr.ind = T), "upper")
   N <- nrow(prev)
-  rands <- matrix(runif(N*N, 0, 1), nrow = N) # select random numbers from here
-  
+
   # Modify the new adjacency matrix (upper triangle only)
   new[h00] <- rbinom(n = nrow(h00), size = 1, 
                      prob = rbeta(n = nrow(h00), 
@@ -98,15 +97,17 @@ update.network <- function(ind, # starting index for the history list.
 
 # remove.network.nodes -----------------------------------------------------
 # Function to remove a node from the network.
-remove.network.nodes <- function(network, previous, n.removed = 1, id = NULL, 
+remove.network.nodes <- function(network, previous, previousPrevious,
+                                n.removed = 1, id = NULL, 
                                 pm, # both bereaved 
                                 ps, # one bereaved, one not
                                 pa, # neither bereaved
                                 histMultiplier) {
+  # SETUP
   # Calculate population size in the current network
   N <- nrow(network)
   
-  # Assuming no node is specified, remove a random node. `del` is the node to remove.
+  # Select nodes to remove
   if(is.null(id)){
     del <- sample(1:N, n.removed, replace = FALSE)
   }else{
@@ -122,10 +123,19 @@ remove.network.nodes <- function(network, previous, n.removed = 1, id = NULL,
   # set self edges to NA
   edges[,del] <- NA
   
-  # Remove the node (set row and column to NA)
+  # REMOVE NODE
   network[del,] <- NA # rows 
   network[,del] <- NA # columns
   N <- N-1 # update the population size.
+  
+  # UPDATE OTHER EDGES
+  h00 <- dedup(which(previous == previousPrevious & previous == 0, arr.ind = T), "upper")
+  h11 <- dedup(which(previous == previousPrevious & previous == 1, arr.ind = T), "upper")
+  h01 <- dedup(which(previousPrevious < previous, arr.ind = T), "upper")
+  h10 <- dedup(which(previousPrevious > previous, arr.ind = T), "upper")
+  
+  
+  
   
   # Calculate extent of bereavement--how many friends did each individual lose?
   nFriendsLost <- colSums(edges)
@@ -133,7 +143,7 @@ remove.network.nodes <- function(network, previous, n.removed = 1, id = NULL,
   propFriendsLost <- nFriendsLost/nFriendsHad
   propFriendsLost[is.nan(propFriendsLost)] <- 0
   
-  
+  # Create a data frame showing history
 
   # Now it's time to update the network.
   # First we create a data frame of all the new edges and their current and past two states.
