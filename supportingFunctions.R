@@ -96,16 +96,31 @@ update.network <- function(ind, # starting index for the history list.
 
 
 # remove.and.rewire -----------------------------------------------------
-# Function to remove a node from the network.
-remove.and.rewire <- function(network, previous, previousPrevious,
-                                n.removed = 1, id = NULL, 
-                                pm, # both bereaved 
-                                ps, # one bereaved, one not
-                                pa, # neither bereaved
-                                histMultiplier,
-                                coefAdd = 1, # defaults to 1: proportion of friends is the coefficient to increase by.
-                                coefLose = 1) {
-  # SETUP
+# Function to remove a node from the network, and then perform rewiring.
+remove.and.rewire <- function(networkList, # network history so far. Must be a list of length >= 3.
+                                n.removed = 1, 
+                                id = NULL, # if desired, which node(s) to remove. Can be a single integer value, or a vector. If !is.null(id), then length(id) must be equal to n.removed.
+                                coefAdd = 1, # multiplier for proportion of friends lost when determining how much to *increase* the probability of adding an edge. May be positive or negative. If 0, then losing friends does not modify the baseline probability of adding an edge. Default is 1.
+                                coefLose = 1 # multiplier for proportion of friends lost when determining how much to *decrease* the probability of losing an edge. May be positive or negative. If 0, then losing friends does not modify the baseline probability of adding an edge. Default is 1.
+                              ) {
+  # ARGUMENT CHECKS
+  checkmate::assertClass(networkList, "list")
+  if(length(networkList) < 3){
+    stop("Argument `networkList` must be a list of >= 3 elements.")
+  }
+  checkmate::assertInteger(n.removed, len = 1) # XXX add min/max
+  if(!is.null(id)){ # if specifying nodes to remove, number must match n.removed.
+    checkmate::assertNumeric(id, len = n.removed, any.missing = FALSE) # XXX add min/max
+  }
+  checkmate::assertNumeric(coefAdd, len = 1, any.missing = FALSE)
+  checkmate::assertNumeric(coefAdd, len = 1, any.missing = FALSE)
+
+  # SETUP # XXX fix titles, good grief
+  # Identify current and past networks
+  network <- networkList[[length(networkList)]]
+  previous <- networkList[[length(networkList)-1]]
+  previousPrevious <- networkList[[length(networkList)-2]]
+  
   # Calculate population size in the current network
   N <- nrow(network)
   
