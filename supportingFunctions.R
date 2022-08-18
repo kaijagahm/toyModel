@@ -102,7 +102,9 @@ remove.network.nodes <- function(network, previous, previousPrevious,
                                 pm, # both bereaved 
                                 ps, # one bereaved, one not
                                 pa, # neither bereaved
-                                histMultiplier) {
+                                histMultiplier,
+                                coefAdd = 1, # defaults to 1: proportion of friends is the coefficient to increase by.
+                                coefLose = 1) {
   # SETUP
   # Calculate population size in the current network
   N <- nrow(network)
@@ -114,105 +116,111 @@ remove.network.nodes <- function(network, previous, previousPrevious,
     del <- id
   }
   
-  # First, capture the edges involving the removed individual
+  # First, capture the edges involving the removed individual(s)
   edges <- network[del,] # row ([del,]), excluding self col ([,-del])
   if(n.removed == 1){ # if we only removed one individual, `edges` is a vector. Have to convert it back to a matrix.
     edges <- matrix(edges, nrow = 1, byrow = TRUE)
   } # if we removed more than one individual, `edges` is already a matrix.
   
-  # set self edges to NA
-  edges[,del] <- NA
-  
-  # REMOVE NODE
-  network[del,] <- NA # rows 
-  network[,del] <- NA # columns
-  N <- N-1 # update the population size.
-  
-  # UPDATE OTHER EDGES
+  # UPDATE EDGES TO MAINTAIN HISTORY
   h00 <- dedup(which(previous == previousPrevious & previous == 0, arr.ind = T), "upper")
   h11 <- dedup(which(previous == previousPrevious & previous == 1, arr.ind = T), "upper")
   h01 <- dedup(which(previousPrevious < previous, arr.ind = T), "upper")
   h10 <- dedup(which(previousPrevious > previous, arr.ind = T), "upper")
   
+  network[h00] <- rbinom(n = nrow(h00), size = 1, 
+                     prob = rbeta(n = nrow(h00), 
+                                  shape1 = add00[1], shape2 = add00[2]))
+  network[h11] <- rbinom(n = nrow(h11), size = 1,
+                     prob = rbeta(n = nrow(h11),
+                                  shape1 = lose11[1], shape2 = lose11[2]))
+  network[h01] <- rbinom(n = nrow(h01), size = 1,
+                     prob = lose01)
+  network[h10] <- rbinom(n = nrow(h10), size = 1,
+                     prob = add10)
   
+  # Symmetrize the node-removed network
+  network <- as.matrix(sna::symmetrize(network, rule = "upper")) # copy the upper triangle over the lower triangle
   
+  # Remove node
+  network[del,] <- NA # rows 
+  network[,del] <- NA # columns
+  N <- N-1 # update the population size.
   
   # Calculate extent of bereavement--how many friends did each individual lose?
   nFriendsLost <- colSums(edges)
   nFriendsHad <- colSums(previous) # how many friends they had
   propFriendsLost <- nFriendsLost/nFriendsHad
   propFriendsLost[is.nan(propFriendsLost)] <- 0
+  propFriendsLostDF <- data.frame(node = 1:length(propFriendsLost),
+                                  propFriendsLost = propFriendsLost)
   
-  # Create a data frame showing history
 
-  # Now it's time to update the network.
-  # First we create a data frame of all the new edges and their current and past two states.
-  # Calculate probability of new edge forming or old edge being lost according to the baseline probabilities of the network.
-  # Can define two coefficients:
-    # `connectModifier` is the extent to which increasing bereavement makes an individual more likely to connect with others. If connectModifier is 1, then losing 4 friends makes an individual 4x more likely to make a new connection than it would be if it hadn't lost any friends. If connectModifier is 0.5, then losing 4 friends makes an individual 2x more likely to make a new connection than it would be if it hadn't lost any friends. If connectModifier is 0, then losing friends has no effect on the individual's tendency to form new connections.
-      # Because of the 0, we're going to have to multiply the existing probability by `1+connectModifier*nLostFriends`
-    # `maintainModifier` is the extent to which increasing bereavement makes an individual more likely to maintain its existing connections. 
+  # SAVE AFTER-LOSS NETWORK
+  afterLoss <- network # save this as a time step--the network after a loss but before rewiring.
   
-  # Now update the network.
-  # First, allocate edges between mutually bereaved nodes (2nd-degree rewiring)
-  # get potential edges, as edge list
-  potentials <- which(network[bereaved, bereaved, # edges between second-degree connections
-                              drop = FALSE] == 0, # keep format. Only edges that didn't already exist.
-                      arr.ind = T)
+  # REWIRING
+  prev <- afterLoss
+  prevPrev <- previous
+  new <- prev
   
+  # Calculate baseline probabilities
+  h00 <- as.data.frame(dedup(which(prev == prevPrev & prev == 0, arr.ind = T), "upper")) %>%
+    setNames(., c("ind1", "ind2"))
+  h11 <- as.data.frame(dedup(which(prev == prevPrev & prev == 1, arr.ind = T), "upper")) %>%
+    setNames(., c("ind1", "ind2"))
+  h01 <- as.data.frame(dedup(which(prevPrev < prev, arr.ind = T), "upper")) %>%
+    setNames(., c("ind1", "ind2"))
+  h10 <- as.data.frame(dedup(which(prevPrev > prev, arr.ind = T), "upper")) %>%
+    setNames(., c("ind1", "ind2"))
   
-  # then allocate a new edge vs not
-  if(length(potentials) > 0){
-    potentials <- dedup(potentials, triangle = "upper") # only the upper triangle
-    
-    # for each edge, decide whether it forms or not (0 or 1)
-    probs <- abs(rnorm(nrow(potentials), mean = pm, sd = 0.1))
-    multiply <- previous[bereaved, bereaved][potentials]*histMultiplier
-    probs.adjusted <- probs*multiply
-    probs.adjusted[probs.adjusted > 1] <- 1
-    probs.adjusted[probs.adjusted < 0] <- 0
-    new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
-    
-    # update the network
-    network[bereaved, bereaved][potentials] <- new.edge # update edges between bereaved with either a 0 or a 1
-    network <- sna::symmetrize(network, rule = "upper") # copy upper triangle
-  }
+  h00$baselineProb <- rbeta(n = nrow(h00), shape1 = add00[1], shape2 = add00[2])
+  h11$baselineProb <- rbeta(n = nrow(h11), shape1 = lose11[1], shape2 = lose11[2])
+  h01$baselineProb <- lose01
+  h10$baselineProb <- add10
   
-  # Second, allocate edges between bereaved and non-bereaved nodes
+  # Modify baseline probabilities based on friends lost
+  h00 <- left_join(h00, propFriendsLostDF, by = c("ind1" = "node")) %>%
+    rename("mod1" = propFriendsLost) %>%
+    left_join(., propFriendsLostDF, by = c("ind2" = "node")) %>%
+    rename("mod2" = propFriendsLost) %>%
+    mutate(newProb = baselineProb + ((mod1+mod2)*coefAdd*baselineProb)) # XXX coefAdd
   
-  potentials <- which(network[bereaved, non.bereaved, drop = FALSE] == 0, 
-                      arr.ind = T)
-  if(length(potentials) > 0){
-    potentials <- dedup(potentials, triangle = "upper")
-    # for each edge, decide whether it forms or not (0 or 1)
-    probs <- abs(rnorm(nrow(potentials), mean = ps, sd = 0.1))
-    multiply <- previous[bereaved, non.bereaved][potentials]*histMultiplier
-    probs.adjusted <- probs*multiply
-    probs.adjusted[probs.adjusted > 1] <- 1
-    probs.adjusted[probs.adjusted < 0] <- 0
-    new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
-    
-    network[bereaved, non.bereaved][potentials] <- new.edge
-    network <- sna::symmetrize(network, rule = "upper")
-  }
+  h10 <- left_join(h10, propFriendsLostDF, by = c("ind1" = "node")) %>%
+    rename("mod1" = propFriendsLost) %>%
+    left_join(., propFriendsLostDF, by = c("ind2" = "node")) %>%
+    rename("mod2" = propFriendsLost) %>%
+    mutate(newProb = baselineProb + ((mod1+mod2)*coefAdd*baselineProb)) # XXX coefAdd
   
-  # Finally, allocate edges between mutually non-bereaved nodes
-  potentials <- which(network[non.bereaved, non.bereaved, drop = FALSE] == 0, 
-                      arr.ind = T)
-  if(length(potentials) > 0){
-    potentials <- dedup(potentials, triangle = "upper")
-    
-    # for each edge, decide whether it forms or not (0 or 1)
-    probs <- abs(rnorm(nrow(potentials), mean = pa, sd = 0.1))
-    multiply <- previous[non.bereaved, non.bereaved][potentials]*histMultiplier
-    probs.adjusted <- probs*multiply
-    probs.adjusted[probs.adjusted > 1] <- 1
-    probs.adjusted[probs.adjusted < 0] <- 0
-    new.edge <- rbinom(n = nrow(potentials), size = 1, prob = probs.adjusted)
-    
-    network[non.bereaved, non.bereaved][potentials] <- new.edge
-    network <- sna::symmetrize(network, rule = "upper")
-  }
+  h11 <- left_join(h11, propFriendsLostDF, by = c("ind1" = "node")) %>%
+    rename("mod1" = propFriendsLost) %>%
+    left_join(., propFriendsLostDF, by = c("ind2" = "node")) %>%
+    rename("mod2" = propFriendsLost) %>%
+    mutate(newProb = baselineProb + ((mod1+mod2)*coefLose*baselineProb)) # XXX coefLose
   
-  return(list(network = network, del = del))
+  h01 <- left_join(h01, propFriendsLostDF, by = c("ind1" = "node")) %>%
+    rename("mod1" = propFriendsLost) %>%
+    left_join(., propFriendsLostDF, by = c("ind2" = "node")) %>%
+    rename("mod2" = propFriendsLost) %>%
+    mutate(newProb = baselineProb + ((mod1+mod2)*coefLose*baselineProb)) # XXX coefLose
+  
+  # Do the rewiring--calculate new edges
+  new[as.matrix(h00[,1:2])] <- rbinom(n = nrow(h00), size = 1, 
+                         prob = h00$newProb)
+  new[as.matrix(h11[,1:2])] <- rbinom(n = nrow(h11), size = 1,
+                         prob = h11$newProb)
+  new[as.matrix(h01[,1:2])] <- rbinom(n = nrow(h01), size = 1,
+                         prob = h01$newProb)
+  new[as.matrix(h10[,1:2])] <- rbinom(n = nrow(h10), size = 1,
+                         prob = h10$newProb)
+  
+  # Symmetrize rewired network
+  new <- as.matrix(sna::symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
+  
+  # SAVE REWIRED NETWORK
+  rewired <- new # save this as a time step--the network after rewiring
+  
+  return(list(networks = list("afterLoss" = afterLoss,
+                              "rewired" = rewired),
+              del = del))
 }
