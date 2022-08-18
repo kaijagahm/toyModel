@@ -12,36 +12,49 @@ runModel <- function(N = 50, # Nodes in the network
                      edge.prob = 0.04, # This is derived from the average network density, when taking a 5-day increment, from parameterizingTheModel.Rmd.
                      burn.in = 50,
                      burn.out = 50,
-                     pm = 0.3,
-                     ps = 0.1, 
-                     pa = 0.2,
                      add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
                      lose01 = 0.3, 
                      add10 = 0.2,
                      lose11 = c(0.3283134, 0.3062181), # beta distribution parameters derived from parameterizingTheModel.Rmd.
-                     histMultiplier = 1.2,
                      doRemoval = TRUE){
   # ARGUMENT CHECKS
   # XXX update these.
   
-  # RANDOM STARTING NETWORK
-  network.orig <- sna::rgraph(N, tprob = edge.prob, 
-                              mode = "graph") # gives undirected graph, already symmetrized.
-  
   # BURN-IN
   ## Empty list to hold networks
   network.history <- vector(mode = "list", length = burn.in + 1)
-  ## Create pre-history
+  ## Create first two networks
   network.history[[1]] <- matrix(0, N, N) # blank network to enable looking 2 timesteps back
-  network.history[[2]] <- network.orig # baseline network
+  network.history[[2]] <- sna::rgraph(N, tprob = edge.prob, 
+                                      mode = "graph") # random starting network
   
   ## Create the rest of the burn-in-period networks, starting at the 3rd element.
   ## The last element (network.history[[burn.in+1]]) is the one that will be modified by removing node(s).
-  for(i in 3:burn.in+1){
+  for(i in 3:(burn.in+1)){
     output <- update.network(ind = i, network.history, add00 = add00, 
                              add10 = add10, lose01 = lose01, lose11 = lose11)
     network.history[[i]] <- output # update history
   }
+
+  # assign names so we can keep track of where the removal happened
+  names(network.history) <- c(paste0("history_", 1:burn.in), "removed")
+  # keep in mind that even though we've called the (burn.in+1)th slice "removed", it does not actually have the node(s) removed (aka set to NA) yet. We'll do that next.
+  
+  # SELECT WHICH NODE(S) TO REMOVE
+  if(is.null(id)){
+    del <- sample(1:N, n.removed, replace = FALSE)
+  }else{
+    del <- id
+  }
+  
+  # REMOVE NODES
+  network.history[["removed"]][del,] <- NA # set rows to NA
+  network.history[["removed"]][,del] <- NA # set cols to NA
+  
+  # CALCULATE
+  
+  
+  
   
   # Removal/perturbation and rewiring
   rewired.list <- remove.and.rewire(network = network.history[[burn.in]], 
