@@ -104,13 +104,17 @@ remove.and.rewire <- function(networkList, # network history so far. Must be a l
                                 coefLose = 1 # multiplier for proportion of friends lost when determining how much to *decrease* the probability of losing an edge. May be positive or negative. If 0, then losing friends does not modify the baseline probability of adding an edge. Default is 1.
                               ) {
   # ARGUMENT CHECKS
+  # How many nodes in current network?
+  N <- nrow(network)
+  
   checkmate::assertClass(networkList, "list")
   if(length(networkList) < 3){
     stop("Argument `networkList` must be a list of >= 3 elements.")
   }
-  checkmate::assertInteger(n.removed, len = 1) # XXX add min/max
+  checkmate::assertInteger(n.removed, len = 1, upper = N-1, lower = 1)
   if(!is.null(id)){ # if specifying nodes to remove, number must match n.removed.
-    checkmate::assertNumeric(id, len = n.removed, any.missing = FALSE) # XXX add min/max
+    checkmate::assertNumeric(id, len = n.removed, upper = N, lower = 1, 
+                             any.missing = FALSE, unique = TRUE)
   }
   checkmate::assertNumeric(coefAdd, len = 1, any.missing = FALSE)
   checkmate::assertNumeric(coefAdd, len = 1, any.missing = FALSE)
@@ -120,9 +124,6 @@ remove.and.rewire <- function(networkList, # network history so far. Must be a l
   network <- networkList[[length(networkList)]]
   previous <- networkList[[length(networkList)-1]]
   previousPrevious <- networkList[[length(networkList)-2]]
-  
-  # Calculate population size in the current network
-  N <- nrow(network)
   
   # Select nodes to remove
   if(is.null(id)){
