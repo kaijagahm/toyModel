@@ -95,9 +95,9 @@ update.network <- function(ind, # starting index for the history list.
 }
 
 
-# remove.network.nodes -----------------------------------------------------
+# remove.and.rewire -----------------------------------------------------
 # Function to remove a node from the network.
-remove.network.nodes <- function(network, previous, previousPrevious,
+remove.and.rewire <- function(network, previous, previousPrevious,
                                 n.removed = 1, id = NULL, 
                                 pm, # both bereaved 
                                 ps, # one bereaved, one not
