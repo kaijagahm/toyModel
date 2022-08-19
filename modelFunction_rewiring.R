@@ -29,6 +29,11 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   checkmate::assertNumeric(lose01, len = 1, any.missing = FALSE, upper = 1, lower = 0)
   checkmate::assertNumeric(add10, len = 1, any.missing = FALSE, upper = 1, lower = 0)
   checkmate::assertNumeric(lose11, len = 2, any.missing = FALSE)
+  if(!is.null(id)){
+    checkmate::assertInteger(as.integer(id), len = n.removed, lower = 1, upper = N, unique = T)
+  }
+  checkmate::assertNumeric(coefAdd, len = 1, any.missing = FALSE)
+  checkmate::assertNumeric(coefLose, len = 1, any.missing = FALSE)
 
   # BURN-IN
   ## Empty list to hold networks
