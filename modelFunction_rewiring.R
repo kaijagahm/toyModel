@@ -6,20 +6,27 @@
 library(here)
 source(here("supportingFunctions.R")) # all the functions that will be used in the main model
 
-runModel <- function(N = 50, # Nodes in the network
-                     nodes.removed = 1, # Nodes to remove
-                     n.removed = 1, # How many to remove at a time
-                     edge.prob = 0.04, # This is derived from the average network density, when taking a 5-day increment, from parameterizingTheModel.Rmd.
-                     burn.in = 50,
-                     recovery = 50,
+runModel <- function(N = 50, # Number of nodes in the starting network. Must be an integer > 2. Default is 50.
+                     n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
+                     edge.prob = 0.04, # Initial edge probability. This is derived from the average network density, when taking a 5-day increment, from parameterizingTheModel.Rmd.
+                     burn.in = 50, # How many iterations of baseline dynamics to run before node removals.
+                     recovery = 50, # How many iterations of baseline dynamics to run after node removals.
                      add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
-                     lose01 = 0.3, 
-                     add10 = 0.2,
-                     lose11 = c(0.3283134, 0.3062181), # beta distribution parameters derived from parameterizingTheModel.Rmd.
-                     doRemoval = TRUE){
-  # ARGUMENT CHECKS
-  # XXX update these.
+                     lose01 = 0.3, # Probability of losing an edge with history h01. Derived from real data.
+                     add10 = 0.2, # Probability of gaining an edge with history h10. Derived from real data.
+                     lose11 = c(0.3283134, 0.3062181)){ # beta distribution parameters derived from parameterizingTheModel.Rmd.)
   
+  # ARGUMENT CHECKS
+  checkmate::assertInteger(as.integer(N), lower = 2, any.missing = FALSE, len = 1)
+  checkmate::assertInteger(as.integer(n.removed), lower = 0, upper = N-1, any.missing = FALSE, len = 1)
+  checkmate::assertNumeric(edgeProb, len = 1, lower = 0, upper = 1, any.missing = FALSE)
+  checkmate::assertInteger(as.integer(burn.in), lower = 2, any.missing = FALSE, len = 1)
+  checkmate::assertInteger(as.integer(recovery), lower = 0, any.missing = FALSE, len = 1)
+  checkmate::assertNumeric(add00, len = 2, any.missing = FALSE)
+  checkmate::assertNumeric(lose01, len = 1, any.missing = FALSE, upper = 1, lower = 0)
+  checkmate::assertNumeric(add10, len = 1, any.missing = FALSE, upper = 1, lower = 0)
+  checkmate::assertNumeric(lose11, len = 2, any.missing = FALSE)
+
   # BURN-IN
   ## Empty list to hold networks
   network.history <- vector(mode = "list", length = burn.in + 1)
@@ -98,7 +105,7 @@ runModel <- function(N = 50, # Nodes in the network
                                TRUE ~ baselineProb)) 
   
   # DRAW NEW EDGES 
-  newEdges <- rbinom(1:nrow(allEdges), 1, prob = allEdges$newProb)
+  newEdges <- suppressWarnings(rbinom(1:nrow(allEdges), 1, prob = allEdges$newProb))
   #  note that all these probabilities have been converted to probabilities of "success", aka probability of the edge *existing*.
   allEdges$rewired <- newEdges
   
@@ -119,7 +126,7 @@ runModel <- function(N = 50, # Nodes in the network
   # CONTINUE BASELINE DYNAMICS UNTIL THE END OF recovery
   network.history <- append(network.history, rep(NA, recovery))
   names(network.history)[(which(names(network.history) == "rewired")+1):length(network.history)] <- paste0("recovery_", 1:recovery)
-
+  
   for(i in (burn.in+3):length(network.history)){
     output <- update.network(ind = i, network.history, add00 = add00, 
                              add10 = add10, lose01 = lose01, lose11 = lose11)
@@ -132,7 +139,19 @@ runModel <- function(N = 50, # Nodes in the network
     return(x)
   })
   
-  # RETURN LIST: NETWORK HISTORY AND DELETED NODES
+  # FULLY REMOVE THE DELETED NODES (instead of just setting them to NA)
+  ## If we don't do this, then they will just be treated as isolated nodes, which isn't what we need to do.
+  
+  
+  # CREATE NETWORK GRAPHS FROM ADJACENCY MATRICES.
+  ## Remove deleted nodes. Note that deleted nodes need to be distinct from isolated nodes, which is why I need to actually remove them. Right now, I think igraph::graph_from_adjacency_matrix() treats 0's and NA's the same. 
+  graphs <- lapply(network.history, function(x){
+    igraph::graph_from_adjacency_matrix(x)
+  })
+  
+  ## REMOVE DELETED NODES
+  
+  # RETURN LIST: NETWORK HISTORY, NETWORK GRAPHS, AND DELETED NODES
   return(list("network.history" = network.history,
               "del" = del))
 }
