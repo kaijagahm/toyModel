@@ -9,17 +9,20 @@ source(here("supportingFunctions.R")) # all the functions that will be used in t
 runModel <- function(N = 50, # Number of nodes in the starting network. Must be an integer > 2. Default is 50.
                      n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
                      edge.prob = 0.04, # Initial edge probability. This is derived from the average network density, when taking a 5-day increment, from parameterizingTheModel.Rmd.
-                     burn.in = 50, # How many iterations of baseline dynamics to run before node removals.
-                     recovery = 50, # How many iterations of baseline dynamics to run after node removals.
+                     burn.in = 20, # How many iterations of baseline dynamics to run before node removals.
+                     recovery = 10, # How many iterations of baseline dynamics to run after node removals.
                      add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
                      lose01 = 0.3, # Probability of losing an edge with history h01. Derived from real data.
                      add10 = 0.2, # Probability of gaining an edge with history h10. Derived from real data.
-                     lose11 = c(0.3283134, 0.3062181)){ # beta distribution parameters derived from parameterizingTheModel.Rmd.)
+                     lose11 = c(0.3283134, 0.3062181),
+                     id = NULL,
+                     coefAdd = 1,
+                     coefLose = -1){ # beta distribution parameters derived from parameterizingTheModel.Rmd.)
   
   # ARGUMENT CHECKS
   checkmate::assertInteger(as.integer(N), lower = 2, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(n.removed), lower = 0, upper = N-1, any.missing = FALSE, len = 1)
-  checkmate::assertNumeric(edgeProb, len = 1, lower = 0, upper = 1, any.missing = FALSE)
+  checkmate::assertNumeric(edge.prob, len = 1, lower = 0, upper = 1, any.missing = FALSE)
   checkmate::assertInteger(as.integer(burn.in), lower = 2, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(recovery), lower = 0, any.missing = FALSE, len = 1)
   checkmate::assertNumeric(add00, len = 2, any.missing = FALSE)
