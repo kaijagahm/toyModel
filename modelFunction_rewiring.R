@@ -145,13 +145,20 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   
   # CREATE NETWORK GRAPHS FROM ADJACENCY MATRICES.
   ## Remove deleted nodes. Note that deleted nodes need to be distinct from isolated nodes, which is why I need to actually remove them. Right now, I think igraph::graph_from_adjacency_matrix() treats 0's and NA's the same. 
-  graphs <- lapply(network.history, function(x){
-    igraph::graph_from_adjacency_matrix(x)
+  network.history.nodesRemoved <- network.history
+  for(i in (burn.in+1):length(network.history.nodesRemoved)){
+    network.history.nodesRemoved[[i]] <- network.history.nodesRemoved[[i]][-del,] # remove rows
+    network.history.nodesRemoved[[i]] <- network.history.nodesRemoved[[i]][,-del] # remove cols
+  }
+  
+  ## Make the graphs (now with the right number of nodes)
+  graphs <- lapply(network.history.nodesRemoved, function(x){
+    igraph::graph_from_adjacency_matrix(x, mode = "undirected")
   })
   
-  ## REMOVE DELETED NODES
-  
   # RETURN LIST: NETWORK HISTORY, NETWORK GRAPHS, AND DELETED NODES
-  return(list("network.history" = network.history,
-              "del" = del))
+  return(list("network.history.nas" = network.history,
+              "network.history.nodesRemoved" = network.history.nodesRemoved,
+              "graphs" = graphs,
+              "whichRemoved" = del))
 }
