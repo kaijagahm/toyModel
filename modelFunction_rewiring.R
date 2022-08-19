@@ -11,7 +11,7 @@ runModel <- function(N = 50, # Nodes in the network
                      n.removed = 1, # How many to remove at a time
                      edge.prob = 0.04, # This is derived from the average network density, when taking a 5-day increment, from parameterizingTheModel.Rmd.
                      burn.in = 50,
-                     burn.out = 50,
+                     recovery = 50,
                      add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
                      lose01 = 0.3, 
                      add10 = 0.2,
@@ -24,7 +24,7 @@ runModel <- function(N = 50, # Nodes in the network
   ## Empty list to hold networks
   network.history <- vector(mode = "list", length = burn.in + 1)
   ## Create first two networks
-  network.history[[1]] <- matrix(0, N, N) # blank network to enable looking 2 timesteps back
+  network.history[[1]] <- matrix(0, N, N) # Blank network to enable looking 2 timesteps back # XXX is there a reason this has to be blank? why can't [[1]] and [[2]] both be random graphs with no relation to each other? Think on this.
   network.history[[2]] <- sna::rgraph(N, tprob = edge.prob, 
                                       mode = "graph") # random starting network
   
@@ -35,9 +35,9 @@ runModel <- function(N = 50, # Nodes in the network
                              add10 = add10, lose01 = lose01, lose11 = lose11)
     network.history[[i]] <- output # update history
   }
-
+  
   # assign names so we can keep track of where the removal happened
-  names(network.history) <- c(paste0("history_", 1:burn.in), "removed")
+  names(network.history) <- c(paste0("history_", 1:(burn.in-2)), "back2", "back1", "removed")
   # keep in mind that even though we've called the (burn.in+1)th slice "removed", it does not actually have the node(s) removed (aka set to NA) yet. We'll do that next.
   
   # SELECT WHICH NODE(S) TO REMOVE
@@ -51,41 +51,88 @@ runModel <- function(N = 50, # Nodes in the network
   network.history[["removed"]][del,] <- NA # set rows to NA
   network.history[["removed"]][,del] <- NA # set cols to NA
   
-  # CALCULATE
+  # SEE FRIENDS OF NOW-REMOVED NODES
+  ## Note: decided that for now, we're considering "friends" to be "the ones what were connected to the now-removed node(s) in timestep `back1`", as opposed to "the ones that would have been connected to the now-removed node(s) in timestep `removed`. I'm not positive that this is correct, but I'm going with it for now.
+  friendships <- network.history[["back1"]][del,]
+  if(n.removed == 1){ # if we only removed one individual, `friendships` is a vector. Have to convert it back to a matrix.
+    friendships <- matrix(friendships, nrow = 1, byrow = TRUE)
+  } # if we removed more than one individual, `friendships` is already a matrix.
   
+  # CALCULATE BEREAVEMENT: What proportion of its friends did each individual lose?
+  nFriendsLost <- colSums(friendships)
+  nFriendsHad <- colSums(network.history[["back1"]]) # XXX but see, this still isn't making sense to me. Because then where do the connections from network.history[["removed"]] fit?? Come back to this.
+  propFriendsLost <- nFriendsLost/nFriendsHad
+  propFriendsLost[is.nan(propFriendsLost)] <- 0
+  propFriendsLost[del] <- NA # set NA's for the removed nodes
+  propFriendsLostDF <- data.frame(node = 1:length(propFriendsLost),
+                                  propFriendsLost = propFriendsLost)
   
+  # CALCULATE BASELINE PROBABILITIES
+  back1 <- network.history[["back1"]]
+  removed <- network.history[["removed"]]
   
+  allEdges <- as.matrix(uniqueEdges(N))
+  rem <- removed[allEdges]
+  b1 <- back1[allEdges]
+  allEdges <- as.data.frame(allEdges) %>%
+    mutate(back1 = b1,
+           removed = rem) %>%
+    mutate(history = paste0("h", back1, removed),
+           baselineProb = case_when(history == "h00" ~ rbeta(1, shape1 = add00[1], shape2 = add00[2]),
+                                    history == "h10" ~ add10,
+                                    history == "h11" ~ rbeta(1, shape1 = lose11[1], shape2 = lose11[2]),
+                                    history == "h01" ~ lose01))
   
-  # Removal/perturbation and rewiring
-  rewired.list <- remove.and.rewire(network = network.history[[burn.in]], 
-                                    previous = network.history[[burn.in-1]],
-                                    histMultiplier = histMultiplier,
-                                    n.removed = 1, pm = rnorm(1, pm), 
-                                    ps = rnorm(1, ps), pa = rnorm(1, pa))
-  rewired.network <- rewired.list$network # the actual rewired network
-  rewired.del <- rewired.list$del # removed individuals. Used for amending history matrices in order to continue baseline dynamics moving forward
+  # MODIFY PROBS WITH INFORMATION ABOUT FRIENDS LOST
+  # Join information about how many friends each individual lost (need to do two joins, since there are two individuals involved in each edge.)
+  allEdges <- allEdges %>%
+    left_join(., propFriendsLostDF, by = c("from" = "node")) %>%
+    rename("mod1" = propFriendsLost) %>%
+    left_join(., propFriendsLostDF, by = c("to" = "node")) %>%
+    rename("mod2" = propFriendsLost) %>%
+    # XXX TALK THIS THROUGH WITH SOMEONE TO MAKE SURE IT'S CLEAR.
+    mutate(newProb = case_when(history %in% c("h00", "h10") ~ 
+                                 baselineProb + ((mod1+mod2)*coefAdd*baselineProb),
+                               history %in% c("h11", "h01") ~ 
+                                 1-(baselineProb + ((mod1+mod2)*coefLose*baselineProb)),
+                               TRUE ~ baselineProb)) 
   
-  # Continue baseline dynamics following removal
-  ## Set up a list: the old network history, the rewired network, and some placeholders for the burnout
-  history <- append(network.history, list(rewired.network))
-  history <- append(history, rep(NA, burn.out)) # add spots for the burn out
+  # DRAW NEW EDGES 
+  newEdges <- rbinom(1:nrow(allEdges), 1, prob = allEdges$newProb)
+  #  note that all these probabilities have been converted to probabilities of "success", aka probability of the edge *existing*.
+  allEdges$rewired <- newEdges
   
-  for(i in (burn.in+2):length(history)){
-    output <- update.network(ind = i, history, add00 = add00, 
+  # CREATE ADJACENCY MATRIX FOR REWIRED NETWORK
+  rewired <- removed # initialize network of same size
+  rewired[as.matrix(allEdges[,c("from", "to")])] <- allEdges$rewired
+  
+  # SYMMETRIZE REWIRED NETWORK
+  rewired <- as.matrix(sna::symmetrize(rewired, rule = "upper"))
+  
+  # MAKE SURE ALL EDGES THAT SHOULD BE NA ARE NA
+  rewired[del,] <- NA # set rows to NA
+  rewired[,del] <- NA # set cols to NA
+  
+  # ADD `REWIRED` TO NETWORK.HISTORY LIST
+  network.history <- append(network.history, list("rewired" = rewired))
+  
+  # CONTINUE BASELINE DYNAMICS UNTIL THE END OF recovery
+  network.history <- append(network.history, rep(NA, recovery))
+  names(network.history)[(which(names(network.history) == "rewired")+1):length(network.history)] <- paste0("recovery_", 1:recovery)
+
+  for(i in (burn.in+3):length(network.history)){
+    output <- update.network(ind = i, network.history, add00 = add00, 
                              add10 = add10, lose01 = lose01, lose11 = lose11)
-    history[[i]] <- output # update history
+    network.history[[i]] <- output # update history
   }
   
-  # Make sure column names are assigned so we can keep track of the nodes!
-  history <- lapply(history, function(x){
+  # NAME COLUMNS OF EACH NETWORK
+  network.history <- lapply(network.history, function(x){
     colnames(x) <- paste0("v", 1:ncol(x))
     return(x)
   })
   
-  # Now we have to remove the deleted node(s) from all networks following the removal.
-  for(i in (burn.in+1):length(history)){
-    history[[i]] <- history[[i]][-rewired.del,]
-    history[[i]] <- history[[i]][,-rewired.del]
-  }
-  return(history)
+  # RETURN LIST: NETWORK HISTORY AND DELETED NODES
+  return(list("network.history" = network.history,
+              "del" = del))
 }
