@@ -26,36 +26,29 @@ source(here("modelFunction_rewiring.R"))
 # Define parameters
 N = 50
 edge.prob <- 0.04
+n.removed = 10
 burn.in = 20
-burn.out = 5
-pm = 0.3
-ps = 0.1
-pa = 0.2
+recovery = 5
 add00 = c(0.5, 10)
 lose01 = 0.1
 add10 = 0.05
 lose11 = c(0.5, 0.5)
-histMultiplier = 1.2
-doRemoval = TRUE
+coefAdd = 0
+coefLose = -0
 ```
 
 ```{r}
 modelGraphs <- runModel(N = N, # Nodes in the network
-                        edge.prob = edge.prob, 
+                        edge.prob = edge.prob,
+                        n.removed = n.removed,
                         burn.in = burn.in,
-                        burn.out = burn.out,
-                        pm = pm,
-                        ps = ps, 
-                        pa = pa,
+                        recovery = recovery,
                         add00 = add00, 
                         lose01 = lose01, 
                         add10 = add10,
-                        lose11 = lose11, 
-                        histMultiplier = histMultiplier,
-                        doRemoval = doRemoval) %>%
-  lapply(., function(x){
-    igraph::graph_from_adjacency_matrix(x, mode = "undirected", add.colnames = "label")
-  })
+                        lose11 = lose11,
+                        coefAdd = coefAdd,
+                        coefLose = coefLose)$graphs
 
 ```
 
@@ -74,6 +67,7 @@ attrDF <- lapply(modelGraphs, function(x){
     tidygraph::activate(nodes) %>%
     data.frame()
 }) %>%
+  setNames(., NULL) %>%
   data.table::rbindlist(idcol = "slice") %>%
   as.data.frame() %>%
   mutate(beforeAfter = ifelse(slice <= burn.in, "before", "after"))
@@ -273,82 +267,62 @@ First, I run the model 100 times and compute the network measures for each of th
 nRuns <- 100
 modelRuns50 <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
-  modelRuns50[[i]] <- runModel(N = N, # Nodes in the network
-                               edge.prob = edge.prob, 
-                               burn.in = burn.in,
-                               burn.out = burn.out,
-                               pm = pm,
-                               ps = ps, 
-                               pa = pa,
-                               add00 = add00, 
-                               lose01 = lose01, 
-                               add10 = add10,
-                               lose11 = lose11, 
-                               histMultiplier = histMultiplier,
-                               doRemoval = doRemoval) %>%
-    lapply(., function(x){
-      igraph::graph_from_adjacency_matrix(x, mode = "undirected")
-    })
+  modelRuns50[[i]] <- runModel(N = 50, # Nodes in the network
+                        edge.prob = edge.prob,
+                        n.removed = n.removed,
+                        burn.in = burn.in,
+                        recovery = recovery,
+                        add00 = add00, 
+                        lose01 = lose01, 
+                        add10 = add10,
+                        lose11 = lose11,
+                        coefAdd = coefAdd,
+                        coefLose = coefLose)$graphs
 }
 
 modelRuns25 <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
   modelRuns25[[i]] <- runModel(N = 25, # Nodes in the network
-                               edge.prob = edge.prob, 
-                               burn.in = burn.in,
-                               burn.out = burn.out,
-                               pm = pm,
-                               ps = ps, 
-                               pa = pa,
-                               add00 = add00, 
-                               lose01 = lose01, 
-                               add10 = add10,
-                               lose11 = lose11, 
-                               histMultiplier = histMultiplier,
-                               doRemoval = doRemoval) %>%
-    lapply(., function(x){
-      igraph::graph_from_adjacency_matrix(x, mode = "undirected")
-    })
+                        edge.prob = edge.prob,
+                        n.removed = n.removed,
+                        burn.in = burn.in,
+                        recovery = recovery,
+                        add00 = add00, 
+                        lose01 = lose01, 
+                        add10 = add10,
+                        lose11 = lose11,
+                        coefAdd = coefAdd,
+                        coefLose = coefLose)$graphs
 }
 
 modelRuns75 <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
   modelRuns75[[i]] <- runModel(N = 75, # Nodes in the network
-                               edge.prob = edge.prob, 
-                               burn.in = burn.in,
-                               burn.out = burn.out,
-                               pm = pm,
-                               ps = ps, 
-                               pa = pa,
-                               add00 = add00, 
-                               lose01 = lose01, 
-                               add10 = add10,
-                               lose11 = lose11, 
-                               histMultiplier = histMultiplier,
-                               doRemoval = doRemoval) %>%
-    lapply(., function(x){
-      igraph::graph_from_adjacency_matrix(x, mode = "undirected")
-    })
+                        edge.prob = edge.prob,
+                        n.removed = n.removed,
+                        burn.in = burn.in,
+                        recovery = recovery,
+                        add00 = add00, 
+                        lose01 = lose01, 
+                        add10 = add10,
+                        lose11 = lose11,
+                        coefAdd = coefAdd,
+                        coefLose = coefLose)$graphs
 }
 
 modelRuns100 <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
   modelRuns100[[i]] <- runModel(N = 100, # Nodes in the network
-                                edge.prob = edge.prob, 
-                                burn.in = burn.in,
-                                burn.out = burn.out,
-                                pm = pm,
-                                ps = ps, 
-                                pa = pa,
-                                add00 = add00, 
-                                lose01 = lose01, 
-                                add10 = add10,
-                                lose11 = lose11, 
-                                histMultiplier = histMultiplier,
-                                doRemoval = doRemoval) %>%
-    lapply(., function(x){
-      igraph::graph_from_adjacency_matrix(x, mode = "undirected")
-    })
+                        edge.prob = edge.prob,
+                        n.removed = n.removed,
+                        burn.in = burn.in,
+                        recovery = recovery,
+                        add00 = add00, 
+                        lose01 = lose01, 
+                        add10 = add10,
+                        lose11 = lose11,
+                        coefAdd = coefAdd,
+                        coefLose = coefLose)$graphs
 }
 
 modelRunsList <- list(modelRuns25, modelRuns50, modelRuns75, modelRuns100)
@@ -357,6 +331,7 @@ modelRunsList <- list(modelRuns25, modelRuns50, modelRuns75, modelRuns100)
 ```{r echo = FALSE}
 # Compute network-level measures for each model run
 ns <- c(25, 50, 75, 100)
+
 dens <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
   densList <- lapply(.x, function(x){
     lapply(x, function(y){
@@ -403,13 +378,20 @@ modu <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
 ```
 
 Now, I can make some plots to detect general trends in what happens to the network after removal/rewiring.
+```{r}
+# Line placements
+back1 <- which(names(modelGraphs) == "back1") 
+removed <- which(names(modelGraphs) == "removed")
+rewired <- which(names(modelGraphs) == "rewired")
+```
 
 ```{r echo = FALSE}
 dens %>%
+  filter(N == 50) %>%
   ggplot(aes(x = slice, y = density))+
   geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = removed), size = 0.7, lty = 2)+
   facet_wrap(~N)+
   ylab("Density")+
   xlab("Time slice")
@@ -419,6 +401,7 @@ Density behaves the same no matter the number of individuals in the network, jus
 
 ```{r echo = FALSE}
 md %>%
+  filter(N == 50) %>%
   ggplot(aes(x = slice, y = meanDistance))+
   geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
@@ -432,6 +415,7 @@ Mean distance looks like it might have a nonlinear relationship with the number 
 
 ```{r echo = FALSE}
 modu %>%
+  filter(N == 50) %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
@@ -441,7 +425,7 @@ modu %>%
   xlab("Time slice")
 
 modu %>%
-  filter(slice > 3) %>%
+  filter(slice > 3, N == 50) %>%
   ggplot(aes(x = slice, y = nClusters))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
@@ -457,10 +441,11 @@ Modularity seems to behave the same no matter the number of individuals in the n
 
 ```{r echo = FALSE}
 # Prepare the data about removed nodes and network-level measures
+# XXX start here
 
 # NETWORK-LEVEL MEASURES
-networkLevel <- left_join(densDF, mdDF, by = c("run", "slice")) %>%
-  left_join(moduDF, by = c("run", "slice"))
+networkLevel <- left_join(dens, md, by = c("run", "slice", "N")) %>%
+  left_join(modu, by = c("run", "slice", "N"))
 
 # NETWORK-LEVEL MEASURE DELTAS (before and after rewiring)
 deltas <- networkLevel %>%
