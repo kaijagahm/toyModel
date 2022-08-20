@@ -165,7 +165,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   # MAKE GRAPHS -------------------------------------------------------------
   ## Make the graphs (now with the right number of nodes)
   graphs <- lapply(network.history.nodesRemoved, function(x){
-    igraph::graph_from_adjacency_matrix(x, mode = "undirected")
+    igraph::graph_from_adjacency_matrix(x, mode = "undirected", add.colnames = "label")
   })
   
   # RETURN OUTPUTS AS LIST --------------------------------------------------
