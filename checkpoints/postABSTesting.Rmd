@@ -52,55 +52,7 @@ modelGraphs <- runModel(N = N, # Nodes in the network
 
 ```
 
-## 2. How does variation in degree and betweenness emerge in this model?
-
-Because I have not given individuals different tendencies to associate with others, we don't expect to see consistent individual variation in betweenness or degree. It should emerge in each time slice from the random interactions, but there's no reason it should be consistent across time slices.
-
-Compute degree and betweenness for each of the model networks, and visualize how they change over time.
-
-```{r echo = FALSE}
-attrDF <- lapply(modelGraphs, function(x){
-  x %>%
-    set_vertex_attr(., name = "degree", value = degree(x)) %>%
-    set_vertex_attr(., name = "betweenness", value = betweenness(x)) %>%
-    tidygraph::as_tbl_graph() %>%
-    tidygraph::activate(nodes) %>%
-    data.frame()
-}) %>%
-  setNames(., NULL) %>%
-  data.table::rbindlist(idcol = "slice") %>%
-  as.data.frame() %>%
-  mutate(beforeAfter = ifelse(slice <= burn.in, "before", "after"))
-
-# make a long-format version to use for facetted plots
-attrDFLong <- attrDF %>%
-  pivot_longer(cols = c(degree, betweenness), names_to = "measure", values_to = "value")
-```
-
-```{r echo = FALSE}
-# Degree and betweenness over time
-attrDFLong %>%
-  ggplot(aes(x = slice, y = value, col = label, group = label))+
-  facet_wrap(~measure, scales = "free")+
-  geom_line(alpha = 0.7, size = 0.5)+
-  theme_minimal()+
-  geom_vline(xintercept = burn.in+1, col = "red", size = 1)+
-  theme(legend.position = "none")
-
-# Let's just look at a few labels, because this plot is too hard to read
-indivs <- sample(unique(attrDFLong$label), 5)
-attrDFLong %>%
-  filter(label %in% indivs) %>%
-  ggplot(aes(x = slice, y = value, col = label, group = label))+
-  facet_wrap(~measure, scales = "free")+
-  geom_line()+
-  theme_minimal()+
-  geom_vline(xintercept = burn.in+1, col = "red", size = 1)
-
-# Okay, I'm seeing some differentiation, but no clear patterns. Because of how the model is set up, the rank order tends to be maintained for a few consecutive time steps, but not over the whole span of the baseline model. This makes sense, since labels don't have any a priori reason to have higher or lower degrees than other labels.
-```
-
-## 3. For a single model run, examine network-level measures over time
+## 2. For a single model run, examine network-level measures over time
 
 ```{r echo = FALSE}
 # DENSITY
@@ -173,7 +125,7 @@ modularities %>%
   xlab("Time slice")
 ```
 
-## 4. Trends for many model runs
+## 3. Trends for many model runs
 
 First, I run the model 100 times and compute the network measures for each of the model runs.
 
@@ -283,7 +235,7 @@ moduDF %>%
 
 Modularity seems to behave the same no matter the number of individuals in the network.
 
-## 5. Relationship between removed node and network-level measures
+## 4. Relationship between removed node and network-level measures
 
 ```{r echo = FALSE}
 # Prepare the data about removed nodes and network-level measures
