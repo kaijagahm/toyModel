@@ -130,7 +130,7 @@ clustered <- lapply(modelGraphs, function(x){
 modularities <- data.frame(slice = 1:length(clustered),
                            modularity = unlist(lapply(clustered, modularity)),
                            nClusters = unlist(lapply(clustered, length)),
-                           nIndivs = unlist(lapply(clustered, function(x){length(membership(x))})))
+                           nIndivs = unlist(lapply(modelGraphs, function(x){length(V(x))})))
 ```
 
 ```{r echo = FALSE}
@@ -239,7 +239,7 @@ clustered_noIso <- lapply(noIso, function(x){
 mods_noIso <- data.frame(slice = 1:length(clustered_noIso),
                          modularity = unlist(lapply(clustered_noIso, modularity)),
                          nClusters = unlist(lapply(clustered_noIso, length)),
-                         nIndivs = unlist(lapply(clustered_noIso, function(x){length(membership(x))})))
+                         nIndivs = unlist(lapply(noIso, function(x){length(V(x))})))
 
 allModularities <- bind_rows(modularities %>% mutate(allowIso = "Original networks"),
                              mods_noIso %>% mutate(allowIso = "Isolated nodes removed"))
@@ -265,75 +265,24 @@ First, I run the model 100 times and compute the network measures for each of th
 ```{r echo = FALSE}
 # Run 100 times, using the parameters defined at the very beginning of this document.
 nRuns <- 100
-modelRuns50 <- vector(mode = "list", length = nRuns)
+modelRuns <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
-  modelRuns50[[i]] <- runModel(N = 50, # Nodes in the network
-                        edge.prob = edge.prob,
-                        n.removed = n.removed,
-                        burn.in = burn.in,
-                        recovery = recovery,
-                        add00 = add00, 
-                        lose01 = lose01, 
-                        add10 = add10,
-                        lose11 = lose11,
-                        coefAdd = coefAdd,
-                        coefLose = coefLose)$graphs
+  modelRuns[[i]] <- runModel(N = 50, # Nodes in the network
+                             edge.prob = edge.prob,
+                             n.removed = n.removed,
+                             burn.in = burn.in,
+                             recovery = recovery,
+                             add00 = add00, 
+                             lose01 = lose01, 
+                             add10 = add10,
+                             lose11 = lose11,
+                             coefAdd = coefAdd,
+                             coefLose = coefLose)$graphs
 }
-
-modelRuns25 <- vector(mode = "list", length = nRuns)
-for(i in 1:nRuns){
-  modelRuns25[[i]] <- runModel(N = 25, # Nodes in the network
-                        edge.prob = edge.prob,
-                        n.removed = n.removed,
-                        burn.in = burn.in,
-                        recovery = recovery,
-                        add00 = add00, 
-                        lose01 = lose01, 
-                        add10 = add10,
-                        lose11 = lose11,
-                        coefAdd = coefAdd,
-                        coefLose = coefLose)$graphs
-}
-
-modelRuns75 <- vector(mode = "list", length = nRuns)
-for(i in 1:nRuns){
-  modelRuns75[[i]] <- runModel(N = 75, # Nodes in the network
-                        edge.prob = edge.prob,
-                        n.removed = n.removed,
-                        burn.in = burn.in,
-                        recovery = recovery,
-                        add00 = add00, 
-                        lose01 = lose01, 
-                        add10 = add10,
-                        lose11 = lose11,
-                        coefAdd = coefAdd,
-                        coefLose = coefLose)$graphs
-}
-
-modelRuns100 <- vector(mode = "list", length = nRuns)
-for(i in 1:nRuns){
-  modelRuns100[[i]] <- runModel(N = 100, # Nodes in the network
-                        edge.prob = edge.prob,
-                        n.removed = n.removed,
-                        burn.in = burn.in,
-                        recovery = recovery,
-                        add00 = add00, 
-                        lose01 = lose01, 
-                        add10 = add10,
-                        lose11 = lose11,
-                        coefAdd = coefAdd,
-                        coefLose = coefLose)$graphs
-}
-
-modelRunsList <- list(modelRuns25, modelRuns50, modelRuns75, modelRuns100)
 ```
 
 ```{r echo = FALSE}
-# Compute network-level measures for each model run
-ns <- c(25, 50, 75, 100)
-
-dens <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
-  densList <- lapply(.x, function(x){
+densDF <- lapply(modelRuns, function(x){
     lapply(x, function(y){
       edge_density(y)
     }) %>%
@@ -341,14 +290,10 @@ dens <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
       as.data.frame() %>%
       setNames(., "density") %>%
       mutate(slice = 1:nrow(.))
-  })
-  densDF <- data.table::rbindlist(densList, idcol = "run") %>%
-    mutate(N = .y)
-}) %>%
-  data.table::rbindlist()
+  }) %>%
+  data.table::rbindlist(idcol = "run")
 
-md <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
-  densList <- lapply(.x, function(x){
+mdDF <- lapply(modelRuns, function(x){
     lapply(x, function(y){
       mean_distance(y)
     }) %>%
@@ -356,43 +301,34 @@ md <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
       as.data.frame() %>%
       setNames(., "meanDistance") %>%
       mutate(slice = 1:nrow(.))
-  })
-  densDF <- data.table::rbindlist(densList, idcol = "run") %>%
-    mutate(N = .y)
-}) %>%
-  data.table::rbindlist()
+  }) %>%
+  data.table::rbindlist(idcol = "run")
 
-modu <- map2(.x = modelRunsList, .y = ns, .f = function(.x, .y){
-  moduList <- lapply(.x, function(x){
-    clustered <- lapply(x, cluster_fast_greedy)
-    df <- data.frame(slice = 1:length(clustered),
-                     modularity = unlist(lapply(clustered, modularity)),
-                     nClusters = unlist(lapply(clustered, length)),
-                     nIndivs = unlist(lapply(clustered, function(i){length(membership(i))})))
-    return(df)
-  })
-  moduDF <- data.table::rbindlist(moduList, idcol = "run") %>%
-    mutate(N = .y)
+moduDF <- lapply(modelRuns, function(x){
+  clustered <- lapply(x, cluster_fast_greedy)
+  df <- data.frame(slice = 1:length(clustered),
+                       modularity = unlist(lapply(clustered, modularity)),
+                       nClusters = unlist(lapply(clustered, length)),
+                       nIndivs = unlist(lapply(x, function(x){length(V(x))})))
+      return(df)
 }) %>%
-  data.table::rbindlist()
+  data.table::rbindlist(idcol = "run")
 ```
 
 Now, I can make some plots to detect general trends in what happens to the network after removal/rewiring.
 ```{r}
-# Line placements
+# Time slice numbers for line placement
 back1 <- which(names(modelGraphs) == "back1") 
 removed <- which(names(modelGraphs) == "removed")
 rewired <- which(names(modelGraphs) == "rewired")
 ```
 
 ```{r echo = FALSE}
-dens %>%
-  filter(N == 50) %>%
+densDF %>%
   ggplot(aes(x = slice, y = density))+
   geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
   geom_vline(aes(xintercept = removed), size = 0.7, lty = 2)+
-  facet_wrap(~N)+
   ylab("Density")+
   xlab("Time slice")
 ```
@@ -400,13 +336,11 @@ dens %>%
 Density behaves the same no matter the number of individuals in the network, just with less variation. To be expected.
 
 ```{r echo = FALSE}
-md %>%
-  filter(N == 50) %>%
+mdDF %>%
   ggplot(aes(x = slice, y = meanDistance))+
   geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
-  facet_wrap(~N)+
   ylab("Mean Distance")+
   xlab("Time slice")
 ```
@@ -414,23 +348,20 @@ md %>%
 Mean distance looks like it might have a nonlinear relationship with the number of individuals in the network. Need to investigate this further!
 
 ```{r echo = FALSE}
-modu %>%
-  filter(N == 50) %>%
+moduDF %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
-  facet_wrap(~N)+
   ylab("Modularity")+
   xlab("Time slice")
 
-modu %>%
-  filter(slice > 3, N == 50) %>%
+moduDF %>%
+  filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nClusters))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
-  facet_wrap(~N)+
   ylab("Number of clusters")+
   xlab("Time slice")
 ```
@@ -441,45 +372,50 @@ Modularity seems to behave the same no matter the number of individuals in the n
 
 ```{r echo = FALSE}
 # Prepare the data about removed nodes and network-level measures
-# XXX start here
-
 # NETWORK-LEVEL MEASURES
-networkLevel <- left_join(dens, md, by = c("run", "slice", "N")) %>%
-  left_join(modu, by = c("run", "slice", "N"))
+networkLevel <- left_join(densDF, mdDF, by = c("run", "slice")) %>%
+  left_join(moduDF, by = c("run", "slice"))
 
 # NETWORK-LEVEL MEASURE DELTAS (before and after rewiring)
 deltas <- networkLevel %>%
-  filter(slice %in% c(burn.in, burn.in+1, burn.in+2)) %>%
+  filter(slice %in% c(back1, removed, rewired)) %>%
   group_by(run) %>%
-  summarize(dens1 = density[slice == burn.in+1]-density[slice == burn.in],
-            dens2 = density[slice == burn.in+2]-density[slice == burn.in+1],
-            md1 = meanDistance[slice == burn.in+1]-meanDistance[slice == burn.in],
-            md2 = meanDistance[slice == burn.in+2]-meanDistance[slice == burn.in+1],
-            modu1 = modularity[slice == burn.in+1]-modularity[slice == burn.in],
-            modu2 = modularity[slice == burn.in+2]-modularity[slice == burn.in+1]) %>%
+  summarize(dens1 = density[slice == removed]-density[slice == back1],
+            dens2 = density[slice == rewired]-density[slice == removed],
+            md1 = meanDistance[slice == removed]-meanDistance[slice == back1],
+            md2 = meanDistance[slice == rewired]-meanDistance[slice == removed],
+            modu1 = modularity[slice == removed]-modularity[slice == back1],
+            modu2 = modularity[slice == rewired]-modularity[slice == removed]) %>%
   pivot_longer(cols = -run, names_to = "measure", values_to = "value") %>%
   mutate(type = stringr::str_extract(measure, "[0-9]"),
          measure = stringr::str_remove(measure, "[0-9]")) %>%
   mutate(type = ifelse(type == 1, "Before rewiring", "After rewiring"))
 
-# INFO ABOUT THE REMOVED NODE
-removedInfo <- lapply(modelRuns50, function(x){
-  init <- V(x[[1]])$name
-  final <- V(x[[length(x)]])$name
-  removedNumber <- which(!(init %in% final))
-  removedName <- init[!(init %in% final)]
-  removedDegree <- degree(x[[burn.in]])[removedNumber]
-  removedBetweenness <- betweenness(x[[burn.in]])[removedNumber]
-  df <- data.frame(name = removedName, number = removedNumber, 
-                   degree = removedDegree,
-                   btwn = removedBetweenness)
+# INFO ABOUT THE REMOVED NODE(S)
+removedInfo <- lapply(modelRuns, function(x){
+  init <- V(x[[1]])$label
+  final <- V(x[[length(x)]])$label
+  removedNumbers <- which(!(init %in% final))
+  removedNames <- init[!(init %in% final)]
+  removedDegrees <- degree(x[[back1]])[removedNumbers]
+  removedBetweennesses <- betweenness(x[[back1]])[removedNumbers]
+  df <- data.frame(name = removedNames, number = removedNumbers, 
+                   degree = removedDegrees,
+                   btwn = removedBetweennesses)
   return(df)
 }) %>%
   data.table::rbindlist(idcol = "run") %>%
   as.data.frame()
 
+# SUMMARIZE CHARACTERISTICS OF REMOVED NODE(S)
+removedInfoSummary <- removedInfo %>%
+  group_by(run) %>%
+  summarize(meanDeg = mean(degree, na.rm = T),
+            meanBtwn = mean(btwn, na.rm = T))
+
+
 # COMBINE INDIVIDUAL AND NETWORK MEASURES
-full <- removedInfo %>%
+full <- removedInfoSummary %>%
   left_join(deltas, by = "run") %>%
   mutate(label = case_when(measure == "modu" ~ "\u0394 Modularity",
                            measure == "md" ~ "\u0394 Mean Distance",
@@ -519,18 +455,18 @@ plotElements = list(geom_point(shape = 1),
 full %>%
   mutate(label = paste0("|", label, "|")) %>%
   filter(type == "Before rewiring") %>%
-  ggplot(aes(x = degree, y = abs(value)))+
+  ggplot(aes(x = meanDeg, y = abs(value)))+
   plotElements+
-  xlab("Degree of removed node")+
+  xlab("Mean degree of removed nodes")+
   ggtitle("Change")
 
 # DEGREE VS. DELTA 2
 full %>%
   mutate(label = paste0("|", label, "|")) %>%
   filter(type == "After rewiring") %>%
-  ggplot(aes(x = degree, y = abs(value)))+
+  ggplot(aes(x = meanDeg, y = abs(value)))+
   plotElements+
-  xlab("Degree of removed node")+
+  xlab("Mean degree of removed nodes")+
   ggtitle("Recovery")
 ```
 
@@ -539,17 +475,13 @@ What about the ratio between the first and second changes? Aka: what percentage 
 ```{r echo = FALSE, message = FALSE}
 # Create the ratios data to use for these plots
 deltaRatios <- full %>%
-  group_by(run, name, number, degree, btwn, measure, label) %>%
+  group_by(run, meanDeg, meanBtwn, measure, label) %>%
   summarize(ratio = value[2]/value[1],
             absRatio = abs(ratio)) %>%
   mutate(measure = case_when(measure == "modu" ~ "Modularity",
                              measure == "dens" ~ "Density",
                              measure == "md" ~ "Mean Distance",
                              TRUE ~ NA_character_))
-
-# Remove any that are too huge (above 200)
-deltaRatios <- deltaRatios %>%
-  filter(ratio < 200)
 
 # Set some common plot elements
 plotElements = list(geom_point(shape = 1),
@@ -565,15 +497,15 @@ plotElements = list(geom_point(shape = 1),
 
 # DEGREE VS. DELTA RATIO
 deltaRatios %>%
-  ggplot(aes(x = degree, y = ratio))+
+  ggplot(aes(x = meanDeg, y = ratio))+
   plotElements+
-  xlab("Degree of removed node")+
+  xlab("Mean degree of removed nodes")+
   ggtitle("Change/Recovery")
 
 # DEGREE VS. abs(DELTA RATIO)
 deltaRatios %>%
-  ggplot(aes(x = degree, y = absRatio))+
+  ggplot(aes(x = meanDeg, y = absRatio))+
   plotElements+
-  xlab("Degree of removed node")+
+  xlab("Mean degree of removed nodes")+
   ggtitle("|Change/Recovery|")
 ```
