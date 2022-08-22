@@ -33,8 +33,8 @@ add00 = c(0.5, 10)
 lose01 = 0.1
 add10 = 0.05
 lose11 = c(0.5, 0.5)
-coefAdd = 1
-coefLose = -1
+coefAdd = 0.5
+coefLose = -0.5
 ```
 
 ```{r}
@@ -127,11 +127,11 @@ modularities %>%
 
 ## 3. Trends for many model runs
 
-First, I run the model 100 times and compute the network measures for each of the model runs.
+First, I run the model 1000 times and compute the network measures for each of the model runs.
 
 ```{r echo = FALSE}
-# Run 100 times, using the parameters defined at the very beginning of this document.
-nRuns <- 100
+# Run 1000 times, using the parameters defined at the very beginning of this document.
+nRuns <- 1000
 modelRuns <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
   modelRuns[[i]] <- runModel(N = 50, # Nodes in the network
@@ -196,7 +196,7 @@ densDF %>%
   mutate(avg = mean(density)) %>%
   ungroup() %>%
   ggplot(aes(x = slice, y = density))+
-  geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
@@ -212,7 +212,7 @@ mdDF %>%
   mutate(avg = mean(meanDistance)) %>%
   ungroup() %>%
   ggplot(aes(x = slice, y = meanDistance))+
-  geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
@@ -228,7 +228,7 @@ moduDF %>%
   mutate(avg = mean(modularity)) %>%
   ungroup() %>%
   ggplot(aes(x = slice, y = modularity))+
-  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
@@ -241,7 +241,7 @@ moduDF %>%
   ungroup() %>%
   filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nClusters/nIndivs))+
-  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
@@ -254,7 +254,7 @@ moduDF %>%
   ungroup() %>%
   filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nIndivs/nClusters))+
-  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
