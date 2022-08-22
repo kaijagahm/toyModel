@@ -173,92 +173,7 @@ modularities %>%
   xlab("Time slice")
 ```
 
-## 4. Exploring modularity
-
-### a. How does `cluster_fast_greedy()` deal with isolated nodes?
-
-```{r echo = FALSE}
-nIsolatedNodes <- lapply(modelGraphs, function(x){
-  sum(degree(x) == 0)
-}) %>% 
-  unlist()
-
-plot(nIsolatedNodes ~ c(1:length(nIsolatedNodes)), type = "l", ylab = "# isolated nodes", xlab = "Time slice")
-```
-
-We can see from this plot that throughout the model, we have some isolated nodes.
-
-The question is, what does the clustering algorithm do to them?
-
-Well, we can also see that there are clusters of size 1:
-
-```{r echo = FALSE}
-nSingletonClusters <- lapply(clustered, function(x){
-  sum(sizes(x) == 1)
-}) %>% 
-  unlist()
-
-plot(nSingletonClusters ~ c(1:length(nSingletonClusters)), type = "l", ylab = "# clusters of size 1", xlab = "Time slice")
-```
-
-Indeed, there's a clear 1:1 relationship:
-
-```{r}
-df <- data.frame(slice = 1:length(nIsolatedNodes),
-                 nIsolatedNodes = nIsolatedNodes,
-                 nSingletonClusters = nSingletonClusters)
-
-df %>%
-  ggplot(aes(x = nIsolatedNodes, y = nSingletonClusters))+
-  geom_point()+
-  geom_line()+
-  theme_minimal()
-```
-
-This means that isolated nodes are treated as their own clusters by the clustering algorithm.
-
-(Note: this also suggests that in this model, a connected node will never be its own cluster. I don't think I can conclude that this is true over the whole parameter space of this model. But it's true at least at these sizes of N and connection probabilities.)
-
-Okay, so, these isolated nodes could be affecting the modularity calculations. What if we compute modularity on networks with the isolated nodes removed?
-
-### b. Modularity when ignoring isolated nodes
-
-```{r echo = FALSE}
-noIso <- lapply(modelGraphs, function(x){
-  g <- delete_vertices(x, which(degree(x) == 0))
-})
-```
-
-How does modularity behave over time when we remove isolated nodes?
-
-```{r warning = FALSE}
-clustered_noIso <- lapply(noIso, function(x){
-  cluster_fast_greedy(x)
-})
-
-mods_noIso <- data.frame(slice = 1:length(clustered_noIso),
-                         modularity = unlist(lapply(clustered_noIso, modularity)),
-                         nClusters = unlist(lapply(clustered_noIso, length)),
-                         nIndivs = unlist(lapply(noIso, function(x){length(V(x))})))
-
-allModularities <- bind_rows(modularities %>% mutate(allowIso = "Original networks"),
-                             mods_noIso %>% mutate(allowIso = "Isolated nodes removed"))
-
-allModularities %>%
-  ggplot(aes(x = slice, y = modularity, col = allowIso))+
-  geom_line(col = moduColor, size = 1)+
-  theme_minimal()+
-  facet_wrap(~allowIso)+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
-  ylab("Modularity")+
-  xlab("Time slice")
-```
-
-These graphs are exactly the same! It seems that isolated nodes are being treated as their own clusters, but they are not affecting the modularity calculation.
-
-To understand this, I need to go back to the mathematical formula that is being used here. But I suspect it has something to do with 0's and 1's and the ratios between them all working out nicely. To discuss more with Noa.
-
-## 5. Trends for many model runs
+## 4. Trends for many model runs
 
 First, I run the model 100 times and compute the network measures for each of the model runs.
 
@@ -368,7 +283,7 @@ moduDF %>%
 
 Modularity seems to behave the same no matter the number of individuals in the network.
 
-## 6. Relationship between removed node and network-level measures
+## 5. Relationship between removed node and network-level measures
 
 ```{r echo = FALSE}
 # Prepare the data about removed nodes and network-level measures
