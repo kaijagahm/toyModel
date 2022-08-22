@@ -33,8 +33,8 @@ add00 = c(0.5, 10)
 lose01 = 0.1
 add10 = 0.05
 lose11 = c(0.5, 0.5)
-coefAdd = 0
-coefLose = -0
+coefAdd = 1
+coefLose = -1
 ```
 
 ```{r}
@@ -192,10 +192,14 @@ rewired <- which(names(modelGraphs) == "rewired")
 
 ```{r echo = FALSE}
 densDF %>%
+  group_by(slice) %>%
+  mutate(avg = mean(density)) %>%
+  ungroup() %>%
   ggplot(aes(x = slice, y = density))+
   geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
-  geom_vline(aes(xintercept = removed), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Density")+
   xlab("Time slice")
 ```
@@ -204,8 +208,12 @@ Density behaves the same no matter the number of individuals in the network, jus
 
 ```{r echo = FALSE}
 mdDF %>%
+  group_by(slice) %>%
+  mutate(avg = mean(meanDistance)) %>%
+  ungroup() %>%
   ggplot(aes(x = slice, y = meanDistance))+
   geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Mean Distance")+
@@ -216,35 +224,47 @@ Mean distance looks like it might have a nonlinear relationship with the number 
 
 ```{r echo = FALSE}
 moduDF %>%
+  group_by(slice) %>%
+  mutate(avg = mean(modularity)) %>%
+  ungroup() %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
-  geom_vline(aes(xintercept = removed), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Modularity")+
   xlab("Time slice")
 
 moduDF %>%
+  group_by(slice) %>%
+  mutate(avg = mean(nClusters/nIndivs)) %>%
+  ungroup() %>%
   filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nClusters/nIndivs))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
-  geom_vline(aes(xintercept = removed), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Clusters per individual")+
   xlab("Time slice")
 
 moduDF %>%
+  group_by(slice) %>%
+  mutate(avg = mean(nIndivs/nClusters)) %>%
+  ungroup() %>%
   filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nIndivs/nClusters))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
+  geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   theme_minimal()+
-  geom_vline(aes(xintercept = removed), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Individuals per cluster")+
   xlab("Time slice")
 ```
 
 Modularity seems to behave the same no matter the number of individuals in the network.
 
-## 4. Relationship between removed node and network-level measures
+## 4. Relationship between removed nodes and network-level measures
 
 ```{r echo = FALSE}
 # Prepare the data about removed nodes and network-level measures
@@ -318,7 +338,7 @@ Indeed, these are highly correlated. I'm not going to make graphs for betweennes
 # Set some common plot elements
 plotElements = list(geom_point(shape = 1),
                     geom_smooth(method = "lm", aes(col = label)),
-                    scale_color_manual(values = c(mdColor, densColor, moduColor)),
+                    scale_color_manual(values = c(densColor, mdColor, moduColor)),
                     facet_wrap(~label, scales = "free", strip.position = "left"),
                     theme_minimal(),
                     theme(strip.placement = "outside",
@@ -352,7 +372,9 @@ What about the ratio between the first and second changes? Aka: what percentage 
 # Create the ratios data to use for these plots
 deltaRatios <- full %>%
   group_by(run, meanDeg, meanBtwn, measure, label) %>%
-  summarize(ratio = value[2]/value[1],
+  summarize(val1 = value[1],
+            val2 = value[2],
+            ratio = val2/val1,
             absRatio = abs(ratio)) %>%
   mutate(measure = case_when(measure == "modu" ~ "Modularity",
                              measure == "dens" ~ "Density",
@@ -373,15 +395,15 @@ plotElements = list(geom_point(shape = 1),
 
 # DEGREE VS. DELTA RATIO
 deltaRatios %>%
-  ggplot(aes(x = meanDeg, y = ratio))+
+  ggplot(aes(x = meanDeg, y = log(ratio)))+
   plotElements+
   xlab("Mean degree of removed nodes")+
-  ggtitle("Change/Recovery")
+  ggtitle("log(Change/Recovery)")
 
 # DEGREE VS. abs(DELTA RATIO)
 deltaRatios %>%
-  ggplot(aes(x = meanDeg, y = absRatio))+
+  ggplot(aes(x = meanDeg, y = log(absRatio)))+
   plotElements+
   xlab("Mean degree of removed nodes")+
-  ggtitle("|Change/Recovery|")
+  ggtitle("log(|Change/Recovery|)")
 ```
