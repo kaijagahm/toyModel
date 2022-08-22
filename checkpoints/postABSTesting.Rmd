@@ -219,17 +219,26 @@ moduDF %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = removed), size = 0.7, lty = 2)+
   ylab("Modularity")+
   xlab("Time slice")
 
 moduDF %>%
   filter(slice > 3) %>%
-  ggplot(aes(x = slice, y = nClusters))+
+  ggplot(aes(x = slice, y = nClusters/nIndivs))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
   theme_minimal()+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
-  ylab("Number of clusters")+
+  geom_vline(aes(xintercept = removed), size = 0.7, lty = 2)+
+  ylab("Clusters per individual")+
+  xlab("Time slice")
+
+moduDF %>%
+  filter(slice > 3) %>%
+  ggplot(aes(x = slice, y = nIndivs/nClusters))+
+  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.5)+
+  theme_minimal()+
+  geom_vline(aes(xintercept = removed), size = 0.7, lty = 2)+
+  ylab("Individuals per cluster")+
   xlab("Time slice")
 ```
 
