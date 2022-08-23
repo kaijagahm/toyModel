@@ -116,7 +116,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                                  baselineProb + ((mod1+mod2)*coefAdd*baselineProb),
                                history %in% c("h11", "h01") ~ 
                                  1-(baselineProb + ((mod1+mod2)*coefLose*baselineProb)),
-                               TRUE ~ baselineProb)) 
+                               TRUE ~ baselineProb)) # XXX change this to NA so it's clearer if something actually has gone wrong.
+  # XXX add a check to make sure there are no NA's--there should be none.
   
     ## DRAW NEW EDGES ----------------------------------------------------------
   newEdges <- suppressWarnings(rbinom(1:nrow(allEdges), 1, prob = allEdges$newProb))
