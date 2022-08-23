@@ -26,7 +26,7 @@ source(here("modelFunction_rewiring.R"))
 # Define parameters
 N = 50
 edge.prob <- 0.04
-n.removed = 10
+n.removed = 1
 burn.in = 20
 recovery = 5
 add00 = c(0.5, 10)
@@ -127,11 +127,11 @@ modularities %>%
 
 ## 3. Trends for many model runs
 
-First, I run the model 1000 times and compute the network measures for each of the model runs.
+First, I run the model 100 times and compute the network measures for each of the model runs.
 
 ```{r echo = FALSE}
-# Run 1000 times, using the parameters defined at the very beginning of this document.
-nRuns <- 1000
+# Run 100 times, using the parameters defined at the very beginning of this document.
+nRuns <- 100
 modelRuns <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
   modelRuns[[i]] <- runModel(N = 50, # Nodes in the network
@@ -398,12 +398,12 @@ deltaRatios %>%
   ggplot(aes(x = meanDeg, y = log(ratio)))+
   plotElements+
   xlab("Mean degree of removed nodes")+
-  ggtitle("log(Change/Recovery)")
+  ggtitle("log(Recovery/Change)")
 
 # DEGREE VS. abs(DELTA RATIO)
 deltaRatios %>%
   ggplot(aes(x = meanDeg, y = log(absRatio)))+
   plotElements+
   xlab("Mean degree of removed nodes")+
-  ggtitle("log(|Change/Recovery|)")
+  ggtitle("log(|Recovery/Change|)")
 ```
