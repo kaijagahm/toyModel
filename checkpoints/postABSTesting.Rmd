@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, out.width = "100%", message = FALSE)
+ggplot2::theme_set(ggplot2::theme_minimal())
 ```
 
 Load some packages that we'll need to use to do these calculations:
@@ -26,7 +27,7 @@ source(here("modelFunction_rewiring.R"))
 # Define parameters
 N = 50
 edge.prob <- 0.04
-n.removed = 1
+n.removed = 10
 burn.in = 20
 recovery = 5
 add00 = c(0.5, 10)
@@ -95,7 +96,6 @@ mdColor <- "#C6BC15"
 densities %>%
   ggplot(aes(x = slice, y = density))+
   geom_line(col = densColor, size = 1)+
-  theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
   ylab("Density")+
   xlab("Time slice")
@@ -103,7 +103,6 @@ densities %>%
 meanDistances %>%
   ggplot(aes(x = slice, y = meanDistance))+
   geom_line(col = mdColor, size = 1)+
-  theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
   ylab("Mean Distance")+
   xlab("Time slice")
@@ -111,7 +110,6 @@ meanDistances %>%
 modularities %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line(col = moduColor, size = 1)+
-  theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
   ylab("Modularity")+
   xlab("Time slice")
@@ -119,7 +117,6 @@ modularities %>%
 modularities %>%
   ggplot(aes(x = slice, y = nClusters))+
   geom_line(col = moduColor, size = 1)+
-  theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
   ylab("Number of clusters")+
   xlab("Time slice")
@@ -131,7 +128,7 @@ First, I run the model 100 times and compute the network measures for each of th
 
 ```{r echo = FALSE}
 # Run 100 times, using the parameters defined at the very beginning of this document.
-nRuns <- 100
+nRuns <- 500
 modelRuns <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
   modelRuns[[i]] <- runModel(N = 50, # Nodes in the network
@@ -198,7 +195,7 @@ densDF %>%
   ggplot(aes(x = slice, y = density))+
   geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
-  theme_minimal()+
+  
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Density")+
   xlab("Time slice")
@@ -214,7 +211,6 @@ mdDF %>%
   ggplot(aes(x = slice, y = meanDistance))+
   geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
-  theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Mean Distance")+
   xlab("Time slice")
@@ -230,7 +226,6 @@ moduDF %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
-  theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Modularity")+
   xlab("Time slice")
@@ -243,7 +238,6 @@ moduDF %>%
   ggplot(aes(x = slice, y = nClusters/nIndivs))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
-  theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Clusters per individual")+
   xlab("Time slice")
@@ -256,7 +250,6 @@ moduDF %>%
   ggplot(aes(x = slice, y = nIndivs/nClusters))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.1)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
-  theme_minimal()+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Individuals per cluster")+
   xlab("Time slice")
@@ -272,7 +265,7 @@ Modularity seems to behave the same no matter the number of individuals in the n
 networkLevel <- left_join(densDF, mdDF, by = c("run", "slice")) %>%
   left_join(moduDF, by = c("run", "slice"))
 
-# NETWORK-LEVEL MEASURE DELTAS (before and after rewiring)
+# NETWORK-LEVEL MEASURE DELTAS (before and rewiring)
 deltas <- networkLevel %>%
   filter(slice %in% c(back1, removed, rewired)) %>%
   group_by(run) %>%
@@ -282,10 +275,10 @@ deltas <- networkLevel %>%
             md2 = meanDistance[slice == rewired]-meanDistance[slice == removed],
             modu1 = modularity[slice == removed]-modularity[slice == back1],
             modu2 = modularity[slice == rewired]-modularity[slice == removed]) %>%
-  pivot_longer(cols = -run, names_to = "measure", values_to = "value") %>%
-  mutate(type = stringr::str_extract(measure, "[0-9]"),
-         measure = stringr::str_remove(measure, "[0-9]")) %>%
-  mutate(type = ifelse(type == 1, "Before rewiring", "After rewiring"))
+  pivot_longer(cols = -run, names_to = "yMeasure", values_to = "yMeasureValue") %>%
+  mutate(change = stringr::str_extract(yMeasure, "[0-9]"),
+         yMeasure = stringr::str_remove(yMeasure, "[0-9]")) %>%
+  mutate(change = ifelse(change == 1, "removal", "rewiring"))
 
 # INFO ABOUT THE REMOVED NODE(S)
 removedInfo <- lapply(modelRuns, function(x){
@@ -293,11 +286,23 @@ removedInfo <- lapply(modelRuns, function(x){
   final <- V(x[[length(x)]])$label
   removedNumbers <- which(!(init %in% final))
   removedNames <- init[!(init %in% final)]
-  removedDegrees <- degree(x[[back1]])[removedNumbers]
-  removedBetweennesses <- betweenness(x[[back1]])[removedNumbers]
-  df <- data.frame(name = removedNames, number = removedNumbers, 
+  removedDegrees <- degree(x[["back1"]])[removedNumbers]
+  removedBetweennesses <- betweenness(x[["back1"]])[removedNumbers]
+  
+  # Pairwise distance matrix for only the about-to-be-removed nodes
+  removedDistances <- distances(x[["back1"]])[removedNumbers, removedNumbers]
+  removedDistances[removedDistances == 0|is.infinite(removedDistances)] <- NA
+  removedDistances[lower.tri(removedDistances)] <- NA # consider only one triangle, since this is undirected
+  removedMeanDistance <- mean(removedDistances, na.rm = T)
+  
+  removedGraph <- subgraph(x[[back1]], vids = removedNumbers)
+  df <- data.frame(name = removedNames, 
+                   number = removedNumbers, 
                    degree = removedDegrees,
-                   btwn = removedBetweennesses)
+                   fullGraphDens = edge_density(x[["back1"]]),
+                   btwn = removedBetweennesses,
+                   dens = edge_density(removedGraph),
+                   meanDist = removedMeanDistance)
   return(df)
 }) %>%
   data.table::rbindlist(idcol = "run") %>%
@@ -307,32 +312,83 @@ removedInfo <- lapply(modelRuns, function(x){
 removedInfoSummary <- removedInfo %>%
   group_by(run) %>%
   summarize(meanDeg = mean(degree, na.rm = T),
-            meanBtwn = mean(btwn, na.rm = T))
-
+            meanBtwn = mean(btwn, na.rm = T),
+            dens = dens[1],
+            fullGraphDens = fullGraphDens[1],
+            meanDist = meanDist[1])
 
 # COMBINE INDIVIDUAL AND NETWORK MEASURES
 full <- removedInfoSummary %>%
   left_join(deltas, by = "run") %>%
-  mutate(label = case_when(measure == "modu" ~ "\u0394 Modularity",
-                           measure == "md" ~ "\u0394 Mean Distance",
-                           measure == "dens" ~ "\u0394 Edge Density",
+  mutate(label = case_when(yMeasure == "modu" ~ "\u0394 Modularity",
+                           yMeasure == "md" ~ "\u0394 Mean Distance",
+                           yMeasure == "dens" ~ "\u0394 Edge Density",
                            TRUE ~ NA_character_))
 ```
 
-First, let's check whether degree and betweenness are indeed highly correlated. We suspect that they are.
+A few sanity checks:
 
 ```{r echo = FALSE}
-# Degree and betweenness are probably highly correlated. Let's check.
+# Are degree and betweenness highly correlated?
 removedInfo %>%
-  ggplot(aes(x = degree, y = btwn))+
+  ggplot(aes(x = jitter(degree), y = btwn))+
   geom_point(shape = 1)+
   geom_smooth(method = "lm")+
-  theme_minimal()+
   ylab("Betweenness")+
   xlab("Degree")
-```
+# yes, they are!
 
-Indeed, these are highly correlated. I'm not going to make graphs for betweenness, just degree.
+# Is there a relationship between the density of the entire graph and the mean distance between the removed nodes? Suspect a negative relationship
+full %>% 
+  select(run, meanDeg, meanBtwn, dens, fullGraphDens, meanDist) %>%
+  distinct() %>%
+  ggplot(aes(x = fullGraphDens, y = meanDist, col = dens))+
+  geom_point(size = 2)+
+  theme_minimal()+
+  geom_smooth(method = "lm")+
+  scale_color_viridis_c(name = "Density \n(removed \nnodes)")+
+  ylab("Mean distance (removed nodes)")+
+  xlab("Density (full graph)")
+# Indeed, we see a fairly strong negative relationship here. Also see that there's some pattern in the densities of the subgraphs of removed nodes.
+
+# Do denser graphs also have denser subgraphs of removed nodes? (Expect a positive relationship, based on the colors in the previous plot.)
+full %>% 
+  select(run, meanDeg, meanBtwn, dens, fullGraphDens, meanDist) %>%
+  distinct() %>%
+  ggplot(aes(x = fullGraphDens, y = dens))+
+  geom_point(size = 2, alpha = 0.5)+
+  geom_smooth(method = "lm")+
+  theme_minimal()+
+  ylab("Density (removed nodes)")+
+  xlab("Density (full graph)")
+# There is a slight positive relationship between the density of the overall graph and the density of the removed nodes, but it is not particularly strong, and there's a ton of variability.
+
+# Is there indeed an inverse relationship between the mean degree of the removed nodes and their mean distance?
+full %>%
+  select(run, meanDeg, meanBtwn, dens, fullGraphDens, meanDist) %>%
+  distinct() %>%
+  ggplot(aes(x = jitter(meanDeg), y = meanDist, col = dens))+
+  scale_color_viridis_c(name = "Density \n(removed \nnodes)")+
+  geom_point(size = 2)+
+  geom_smooth(method = "lm")+
+  theme_minimal()+
+  ylab("Mean distance (removed nodes)")+
+  xlab("Mean degree (removed nodes)")
+# As expected, the more connected removal subgraphs have shorter distances between nodes, and this also generally a higher density. This all checks out.
+# Note that this correlation is stronger than I expected it to be, which makes me wonder if mean degree is not actually such a bad measure for our x axis. 
+
+# Now let's look at the relationship between density and mean distance
+full %>%
+  select(run, meanDeg, meanBtwn, dens, fullGraphDens, meanDist) %>%
+  distinct() %>%
+  ggplot(aes(x = jitter(dens), y = meanDist))+
+  geom_point(size = 2)+
+  geom_smooth(method = "lm")+
+  theme_minimal()+
+  ylab("Mean distance (removed nodes)")+
+  xlab("Density (removed nodes)")
+# As expected, higher density of the removed nodes correlates with lower mean distance between them. 
+```
 
 ```{r echo = FALSE}
 # Set some common plot elements
@@ -340,30 +396,51 @@ plotElements = list(geom_point(shape = 1),
                     geom_smooth(method = "lm", aes(col = label)),
                     scale_color_manual(values = c(densColor, mdColor, moduColor)),
                     facet_wrap(~label, scales = "free", strip.position = "left"),
-                    theme_minimal(),
                     theme(strip.placement = "outside",
                           legend.position = "none",
                           axis.title.x = element_text(size = 11),
                           strip.text.y = element_text(size = 11)),
                     ylab(""))
 
-# DEGREE VS. DELTA 1
+# REMOVAL (REMOVED - BACK1)
 full %>%
+  filter(change == "removal") %>%
   mutate(label = paste0("|", label, "|")) %>%
-  filter(type == "Before rewiring") %>%
-  ggplot(aes(x = meanDeg, y = abs(value)))+
+  ggplot(aes(x = meanDeg, y = yMeasureValue))+
+  geom_point(alpha = 0.5, shape = 1)+
   plotElements+
   xlab("Mean degree of removed nodes")+
-  ggtitle("Change")
+  ggtitle("REMOVAL")
 
-# DEGREE VS. DELTA 2
 full %>%
+  filter(change == "removal") %>%
   mutate(label = paste0("|", label, "|")) %>%
-  filter(type == "After rewiring") %>%
-  ggplot(aes(x = meanDeg, y = abs(value)))+
+  ggplot(aes(x = meanDist, y = yMeasureValue))+
+  geom_point(alpha = 0.5, shape = 1)+
+  plotElements+
+  xlab("Mean distance between removed nodes")+
+  ggtitle("REMOVAL")
+
+# REWIRING (REWIRED - REMOVED)
+full %>%
+  filter(change == "rewiring") %>%
+  mutate(label = paste0("|", label, "|")) %>%
+  ggplot(aes(x = meanDeg, y = yMeasureValue))+
+  geom_point(alpha = 0.5, shape = 1)+
   plotElements+
   xlab("Mean degree of removed nodes")+
-  ggtitle("Recovery")
+  ggtitle("REWIRING")
+
+full %>%
+  filter(change == "rewiring") %>%
+  mutate(label = paste0("|", label, "|")) %>%
+  ggplot(aes(x = meanDist, y = yMeasureValue))+
+  geom_point(alpha = 0.5, shape = 1)+
+  plotElements+
+  xlab("Mean distance between removed nodes")+
+  ggtitle("REWIRING")
+
+# Mean degree and mean distance are basically inverses of each other for removal. For rewiring, they are much more similar, although there's some differentiation in direction. 
 ```
 
 What about the ratio between the first and second changes? Aka: what percentage of the loss/gain is recovered by the rewiring?
@@ -371,22 +448,21 @@ What about the ratio between the first and second changes? Aka: what percentage 
 ```{r echo = FALSE, message = FALSE}
 # Create the ratios data to use for these plots
 deltaRatios <- full %>%
-  group_by(run, meanDeg, meanBtwn, measure, label) %>%
-  summarize(val1 = value[1],
-            val2 = value[2],
+  group_by(run, meanDeg, meanBtwn, dens, fullGraphDens, meanDist, yMeasure, label) %>%
+  summarize(val1 = yMeasureValue[1],
+            val2 = yMeasureValue[2],
             ratio = val2/val1,
             absRatio = abs(ratio)) %>%
-  mutate(measure = case_when(measure == "modu" ~ "Modularity",
-                             measure == "dens" ~ "Density",
-                             measure == "md" ~ "Mean Distance",
+  mutate(yMeasure = case_when(yMeasure == "modu" ~ "Modularity",
+                             yMeasure == "dens" ~ "Density",
+                             yMeasure == "md" ~ "Mean Distance",
                              TRUE ~ NA_character_))
 
 # Set some common plot elements
 plotElements = list(geom_point(shape = 1),
                     geom_smooth(method = "lm", aes(col = label)),
                     scale_color_manual(values = c(mdColor, densColor, moduColor)),
-                    facet_wrap(~measure, scales = "free", strip.position = "left"),
-                    theme_minimal(),
+                    facet_wrap(~yMeasure, scales = "free", strip.position = "left"),
                     theme(strip.placement = "outside",
                           legend.position = "none",
                           axis.title.x = element_text(size = 14),
@@ -398,12 +474,26 @@ deltaRatios %>%
   ggplot(aes(x = meanDeg, y = log(ratio)))+
   plotElements+
   xlab("Mean degree of removed nodes")+
-  ggtitle("log(Recovery/Change)")
+  ggtitle("log(Rewiring/Removal)")
+
+# MEAN DISTANCE VS. DELTA RATIO
+deltaRatios %>%
+  ggplot(aes(x = meanDist, y = log(ratio)))+
+  plotElements+
+  xlab("Mean distance between removed nodes")+
+  ggtitle("log(Rewiring/Removal)")
 
 # DEGREE VS. abs(DELTA RATIO)
 deltaRatios %>%
   ggplot(aes(x = meanDeg, y = log(absRatio)))+
   plotElements+
   xlab("Mean degree of removed nodes")+
-  ggtitle("log(|Recovery/Change|)")
+  ggtitle("log(|Rewiring/Removal|)")
+
+# MEAN DISTANCE VS. abs(DELTA RATIO)
+deltaRatios %>%
+  ggplot(aes(x = meanDist, y = log(absRatio)))+
+  plotElements+
+  xlab("Mean distance between removed nodes")+
+  ggtitle("log(|Rewiring/Removal|)")
 ```
