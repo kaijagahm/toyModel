@@ -18,6 +18,7 @@ library(gifski)
 library(ggraph)
 library(here)
 library(igraph)
+library(tnet) # for the closeness function described here: https://toreopsahl.com/2010/03/20/closeness-centrality-in-networks-with-disconnected-components/
 source(here("modelFunction_rewiring.R"))
 ```
 
@@ -289,6 +290,17 @@ removedInfo <- lapply(modelRuns, function(x){
   removedDegrees <- degree(x[["back1"]])[removedNumbers]
   removedBetweennesses <- betweenness(x[["back1"]])[removedNumbers]
   
+  # Make edge list for calculating closenesses
+  el <- get.edgelist(x[["back1"]], names = TRUE) %>%
+    cbind(., 1) %>%
+    as_tibble() %>%
+    complete(V1 = 1:max(V(x[["back1"]])), V2 = 1:max(V(x[["back1"]])), fill = list(V3 = 0))
+  
+  ## calculate closenesses
+  closenesses <- as.data.frame(suppressWarnings(closeness_w(el, directed = FALSE, gconly = FALSE)))
+  removedClosenesses <- closenesses %>%
+    filter(node %in% removedNumbers)
+  
   # Pairwise distance matrix for only the about-to-be-removed nodes
   removedDistances <- distances(x[["back1"]])[removedNumbers, removedNumbers]
   removedDistances[removedDistances == 0|is.infinite(removedDistances)] <- NA
@@ -303,6 +315,9 @@ removedInfo <- lapply(modelRuns, function(x){
                    btwn = removedBetweennesses,
                    dens = edge_density(removedGraph),
                    meanDist = removedMeanDistance)
+  df <- df %>%
+    left_join(removedClosenesses, by = c("number" = "node"))
+  
   return(df)
 }) %>%
   data.table::rbindlist(idcol = "run") %>%
@@ -315,7 +330,9 @@ removedInfoSummary <- removedInfo %>%
             meanBtwn = mean(btwn, na.rm = T),
             dens = dens[1],
             fullGraphDens = fullGraphDens[1],
-            meanDist = meanDist[1])
+            meanDist = meanDist[1],
+            meanCloseness = mean(closeness, na.rm = T),
+            meanNormalizedCloseness = mean(n.closeness, na.rm = T))
 
 # COMBINE INDIVIDUAL AND NETWORK MEASURES
 full <- removedInfoSummary %>%
@@ -388,6 +405,21 @@ full %>%
   ylab("Mean distance (removed nodes)")+
   xlab("Density (removed nodes)")
 # As expected, higher density of the removed nodes correlates with lower mean distance between them. 
+
+# Because closeness is just another way of measuring mean distance (albeit calculated with reciprocals so maybe a bit different), I expect these two to be pretty closely related.
+full %>%
+  select(run, meanDeg, meanDist, meanCloseness, meanNormalizedCloseness) %>%
+  distinct() %>%
+  ggplot(aes(x = meanDist, y = meanCloseness, col = meanDeg))+
+  scale_color_viridis_c()+
+  geom_point(size = 2)+
+  geom_smooth(method = "lm")+
+  theme_minimal()+
+  ylab("Mean distance (removed nodes)")+
+  xlab("Mean closeness (removed nodes)")
+# indeed, these are definitely correlated, though not as tightly as I would have assumed. I bet that's because of the reciprocal thing or the way the zeroes are calculated. The variation is probably largely attributable to variation in the number of isolated nodes. Indeed, this is confirmed by the smooth color gradient of mean degree. 
+
+# I checked out the graph for normalized closeness and it's exactly the same--that's because all of these networks have the same number of nodes. This suggests we should use normalized closeness, in case we want to compare across networks with different numbers of nodes later.
 ```
 
 ```{r echo = FALSE}
@@ -421,6 +453,15 @@ full %>%
   xlab("Mean distance between removed nodes")+
   ggtitle("REMOVAL")
 
+full %>%
+  filter(change == "removal") %>%
+  mutate(label = paste0("|", label, "|")) %>%
+  ggplot(aes(x = meanNormalizedCloseness, y = yMeasureValue))+
+  geom_point(alpha = 0.5, shape = 1)+
+  plotElements+
+  xlab("Mean normalized closeness of removed nodes")+
+  ggtitle("REMOVAL")
+
 # REWIRING (REWIRED - REMOVED)
 full %>%
   filter(change == "rewiring") %>%
@@ -440,6 +481,15 @@ full %>%
   xlab("Mean distance between removed nodes")+
   ggtitle("REWIRING")
 
+full %>%
+  filter(change == "rewiring") %>%
+  mutate(label = paste0("|", label, "|")) %>%
+  ggplot(aes(x = meanNormalizedCloseness, y = yMeasureValue))+
+  geom_point(alpha = 0.5, shape = 1)+
+  plotElements+
+  xlab("Mean normalized closeness of removed nodes")+
+  ggtitle("REWIRING")
+
 # Mean degree and mean distance are basically inverses of each other for removal. For rewiring, they are much more similar, although there's some differentiation in direction. 
 ```
 
@@ -448,7 +498,7 @@ What about the ratio between the first and second changes? Aka: what percentage 
 ```{r echo = FALSE, message = FALSE}
 # Create the ratios data to use for these plots
 deltaRatios <- full %>%
-  group_by(run, meanDeg, meanBtwn, dens, fullGraphDens, meanDist, yMeasure, label) %>%
+  group_by(run, meanDeg, meanBtwn, meanCloseness, meanNormalizedCloseness, dens, fullGraphDens, meanDist, yMeasure, label) %>%
   summarize(val1 = yMeasureValue[1],
             val2 = yMeasureValue[2],
             ratio = val2/val1,
@@ -469,7 +519,7 @@ plotElements = list(geom_point(shape = 1),
                           strip.text.y = element_text(size = 14)),
                     ylab(""))
 
-# DEGREE VS. DELTA RATIO
+# MEAN DEGREE VS. DELTA RATIO
 deltaRatios %>%
   ggplot(aes(x = meanDeg, y = log(ratio)))+
   plotElements+
@@ -483,7 +533,14 @@ deltaRatios %>%
   xlab("Mean distance between removed nodes")+
   ggtitle("log(Rewiring/Removal)")
 
-# DEGREE VS. abs(DELTA RATIO)
+# MEAN CLOSENESS (NORMALIZED) VS. DELTA RATIO
+deltaRatios %>%
+  ggplot(aes(x = meanNormalizedCloseness, y = log(ratio)))+
+  plotElements+
+  xlab("Mean normalized closeness of removed nodes")+
+  ggtitle("log(Rewiring/Removal)")
+
+# MEAN DEGREE VS. abs(DELTA RATIO)
 deltaRatios %>%
   ggplot(aes(x = meanDeg, y = log(absRatio)))+
   plotElements+
@@ -496,4 +553,11 @@ deltaRatios %>%
   plotElements+
   xlab("Mean distance between removed nodes")+
   ggtitle("log(|Rewiring/Removal|)")
+
+# MEAN CLOSENESS (NORMALIZED) VS. abs(DELTA RATIO)
+deltaRatios %>%
+  ggplot(aes(x = meanNormalizedCloseness, y = log(absRatio)))+
+  plotElements+
+  xlab("Mean normalized closeness of removed nodes")+
+  ggtitle("log(|Rewiring/Removal|od)")
 ```
