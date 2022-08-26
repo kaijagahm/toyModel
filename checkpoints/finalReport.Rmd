@@ -39,16 +39,43 @@ When modeling the effect of multiple mortality on the network, these social situ
 
 In order to investigate the effects of multiple mortality on vulture social networks, I will ask the following questions:
 
-1.  What is the relationship between the characteristics and relationships of the individuals who die and the impact of their mortality on the social network structure?
-    
+1. How is the effect of multiple-node loss on network topology mediated by the number and identity of the lost nodes?
+2. How does a social network rewire following the loss of multiple nodes? (XXX i.e. which hypothesis? But don't want to actually lay out the hypotheses yet because I'm not testing them yet, right?)
 
 # Methods
+
+## Creating the model
+overview of how i decided to approach the model
+### Model parameters and parameterization
+
+```
+N = 50, # Number of nodes in the starting network. Must be an integer > 2. Default is 50.
+                     n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
+                     edge.prob = 0.04, # Initial edge probability. This is derived from the average network density, when taking a 5-day increment, from parameterizingTheModel.Rmd.
+                     burn.in = 20, # How many iterations of baseline dynamics to run before node removals.
+                     recovery = 10, # How many iterations of baseline dynamics to run after node removals.
+                     add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
+                     lose01 = 0.3, # Probability of losing an edge with history h01. Derived from real data.
+                     add10 = 0.2, # Probability of gaining an edge with history h10. Derived from real data.
+                     lose11 = c(0.3283134, 0.3062181),
+                     id = NULL,
+                     coefAdd = 1,
+                     coefLose = -1
+```
 
 ## Data: A Vulture Co-Feeding Network
 
 The data that this model is based on comes from a GPS-tagged population of griffon vultures in Israel. The species is locally critically endangered [@efrat2020a] and is managed by the Israel Nature and Parks Authority (INPA), which runs supplemental feeding stations throughout the country [@spiegel2013]. Israel's griffon vultures live mainly in the Negev and Judean deserts in the south. There is a small population in northeastern Israel and a declining population in the northwest. For this analysis, I restricted the data to the southern population, which is relatively well-mixed and somewhat separated from the northern populations.
 
 As part of a collaborative NSF-BSF project between Orr Spiegel and Noa Pinter-Wollman, nearly 100 vultures have been fitted with GPS transmitters over the past two years. These tags provide location information at 10-minute intervals, with data automatically transmitted to and stored on Movebank. As of 2022, approximately 70% of the griffon population in Israel is tagged. This high coverage of the population means that the majority of a tagged individual's social interactions are with other tagged individuals, allowing us to study social interactions with greater certainty than is possible in many studies of free-ranging animals.
+
+Parameterization: used a certain subset of the data to determine beta distributions.
+
+### Baseline model dynamics
+### Loss of individuals
+### Rewiring mechanism
+
+
 
 # Results	
 Discussion	
