@@ -99,10 +99,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
     mutate(back1 = b1,
            removed = rem) %>%
     mutate(history = paste0("h", back1, removed),
-           baselineProb = case_when(history == "h00" ~ rbeta(1, shape1 = add00[1], shape2 = add00[2]),
-                                    history == "h10" ~ add10,
-                                    history == "h11" ~ rbeta(1, shape1 = lose11[1], shape2 = lose11[2]),
-                                    history == "h01" ~ lose01))
+           baselineProb = case_when(history %in% c("h00", "h10") ~ rbeta(1, shape1 = add00[1], shape2 = add00[2]),
+                                    history %in% c("h11", "h01") ~ rbeta(1, shape1 = lose11[1], shape2 = lose11[2])))
   
     ## MODIFY PROBS WITH INFORMATION ABOUT FRIENDS LOST ------------------------
   # Join information about how many friends each individual lost (need to do two joins, since there are two individuals involved in each edge.)
