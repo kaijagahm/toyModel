@@ -69,7 +69,31 @@ Next, `n.removed` nodes are removed from the network, along with all of their ed
 
 ### Rewiring
 
-Rewiring is the process of individuals establishing new social connections (or, in a weighted network, strengthening existing ones) following node loss. [@farine2021] describes a pattern of "second-degree rewiring" in a network of songbirds following flockmate loss, whereby individuals with ties to the lost individual are more likely to form new connections *with each other* than with other individuals.
+Rewiring is the process of individuals establishing new social connections (or, in a weighted network, strengthening existing ones) following node loss. [@farine2021] describes a pattern of "second-degree rewiring" in a network of songbirds following flockmate loss, whereby individuals with ties to the lost individual are more likely to form new connections with each other than with other individuals.
+
+Since I am interested in determining how the simultaneous loss of multiple individuals affects the structure of the griffon vulture social network, I wanted to be able to test hypotheses about how rewiring proceeds in this system. In other words, how does having been connected to removed individuals affect an individual's tendency to make new connections or retain existing ones? Does second-degree rewiring operate in the griffon vulture system, or do we observe a different pattern?
+
+For each individual remaining in the network after the removal time step, I compute what proportion of its connections in the time step before removal were subsequently removed. This is a coarse measure of how directly affected the focal individual is by the multiple mortality event. For example, if individual A had interacted with B, D, and E, and individuals B and D were lost from the network, then individual A would have a value of 2/3 = 0.66 for its "affectedness". Meanwhile, individual E, which had interacted only with A and C, would not be affected at all (affectedness = 0).
+
+<!--# make a diagram of affectedness here -->
+
+Next, I introduced two parameters into the model, `coefAdd` and `coefLose`. These parameters describe the extent to which an individual's "affectedness" modifies its tendency to form new connections (`coefAdd`) or retain existing ones (`coefLose`). By default, `coefAdd` is set to 1 and `coefLose` is set to -1.
+
+These coefficients are used in conjuction with the affectedness values to modify, for each edge or potential edge, its baseline probabilty of forming. First, I use the "removed" network to compute a baseline probability that each edge will be added or lost in the time step following the removal, taking into account two previous time steps of history as described in [Baseline]. Then, I adjust each edge probability up or down according to the combination of `coefAdd`/`coefLose` and the affectedness of each node.
+
+An example calculation is as follows, for an edge between nodes A and C that has history [1, 0] prior to the removal of nodes B and D from the network, in a model run where `add10` is set to 0.3 and `coefAdd` is set to its default value of 1:
+
+p(add edge A-C) = `add10` + `add10`\*((affectedness~A~ \* `coefAdd`)+(affectedness~C~ \* `coefAdd` ))
+
+p(add edge A-C) = 0.3+0.3\*((0.66\*1)+(0\*1))
+
+p(add edge A-C) = 0.3+0.198
+
+p(add edge A-C) = 0.498
+
+So, node A having lost two of its three connections increases the probability of an edge developing between A and C by 66% in this case. If node C's affectedness had also been 0.66, then the probability for this edge would have increased by 132%, to 0.696. If `coefAdd` were smaller, the increase would be less in either case. Setting `coefAdd` (`coefLose`) to 0 indicates that losing connections does not affect the tendency of a node to form new edges (retain existing edges).
+
+Reversing the signs of `coefAdd` and `coefLose` would produce a scenario in which having lost more connections makes an individual *less*, not more, likely to form any given new edge, and more likely to lose an existing one.
 
 ### Model parameters and parameterization
 
