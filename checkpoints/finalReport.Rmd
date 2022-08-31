@@ -39,43 +39,61 @@ When modeling the effect of multiple mortality on the network, these social situ
 
 In order to investigate the effects of multiple mortality on vulture social networks, I will ask the following questions:
 
-1. How is the effect of multiple-node loss on network topology mediated by the number and identity of the lost nodes?
-2. How does a social network rewire following the loss of multiple nodes? (XXX i.e. which hypothesis? But don't want to actually lay out the hypotheses yet because I'm not testing them yet, right?)
+1.  How is the effect of multiple-node loss on network topology mediated by the number and identity of the lost nodes?
+
+2.  How does a social network rewire following the loss of multiple nodes? (XXX i.e. which hypothesis? But don't want to actually lay out the hypotheses yet because I'm not testing them yet, right? Or maybe I do...)
 
 # Methods
 
-## Creating the model
-overview of how i decided to approach the model
-### Model parameters and parameterization
-
-```
-N = 50, # Number of nodes in the starting network. Must be an integer > 2. Default is 50.
-                     n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
-                     edge.prob = 0.04, # Initial edge probability. This is derived from the average network density, when taking a 5-day increment, from parameterizingTheModel.Rmd.
-                     burn.in = 20, # How many iterations of baseline dynamics to run before node removals.
-                     recovery = 10, # How many iterations of baseline dynamics to run after node removals.
-                     add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
-                     lose01 = 0.3, # Probability of losing an edge with history h01. Derived from real data.
-                     add10 = 0.2, # Probability of gaining an edge with history h10. Derived from real data.
-                     lose11 = c(0.3283134, 0.3062181),
-                     id = NULL,
-                     coefAdd = 1,
-                     coefLose = -1
-```
-
-## Data: A Vulture Co-Feeding Network
+## Study System: A Vulture Co-Feeding Network
 
 The data that this model is based on comes from a GPS-tagged population of griffon vultures in Israel. The species is locally critically endangered [@efrat2020a] and is managed by the Israel Nature and Parks Authority (INPA), which runs supplemental feeding stations throughout the country [@spiegel2013]. Israel's griffon vultures live mainly in the Negev and Judean deserts in the south. There is a small population in northeastern Israel and a declining population in the northwest. For this analysis, I restricted the data to the southern population, which is relatively well-mixed and somewhat separated from the northern populations.
 
-As part of a collaborative NSF-BSF project between Orr Spiegel and Noa Pinter-Wollman, nearly 100 vultures have been fitted with GPS transmitters over the past two years. These tags provide location information at 10-minute intervals, with data automatically transmitted to and stored on Movebank. As of 2022, approximately 70% of the griffon population in Israel is tagged. This high coverage of the population means that the majority of a tagged individual's social interactions are with other tagged individuals, allowing us to study social interactions with greater certainty than is possible in many studies of free-ranging animals.
+As part of a collaborative NSF-BSF project between Orr Spiegel and Noa Pinter-Wollman, nearly 100 vultures have been fitted with GPS transmitters over the past two years. These tags provide location information at 10-minute intervals, with data automatically transmitted to Movebank. As of 2022, approximately 70% of the griffon population in Israel is tagged. This high coverage of the population means that the majority of a tagged individual's social interactions are with other tagged individuals, allowing us to study social interactions with greater certainty than is possible in many studies of free-ranging animals.
+
+Despite the extent of this data set, it is not sufficient to directly address questions about the impact of multiple mortality on the vulture social network. While poisoning events pose a severe threat to the vulture population, mass poisonings have occurred only a handful of times during the current study, and in several instances they occurred in regions where relatively smaller proportions of the population were tagged. Therefore, I wanted to create a model that would mimic the baseline dynamics of the real vulture social network, and which I could perturb to test hypotheses about the effect of multiple mortality on the griffon vulture social network.
+
+## Model structure and parameterization
+
+### Baseline
+
+I set out to create an individual-based model that would plausibly capture the day-to-day dynamics of the griffon vulture social network. In the past, the NSF-BSF vulture team has created interaction networks specific to different social situations, defining the network edges in different, biologically meaningful ways for each situation [@sharma2022]. For example, an interaction in the "co-feeding" network is defined as two individuals coming within 50 meters of each other during at least two consecutive 10-minute intervals. My model approximates a co-feeding network, and I have parameterized it based on data from existing co-feeding networks.
+
+The initial network consists of `N` nodes, between which binary edges are randomly assigned with probability `edge.prob`. In each subsequent time step, each edge is assigned as present or absent (0/1) based on its history in the previous two time steps. There are four probability parameters. `add10` and `lose01` are the probabilities, respectively, of adding an edge with history [1, 0] (the edge did not exist in the t-1 network, but did exist in the t-2 network); and of losing an edge with history [0, 1] (the edge existed in the t-1 network but *not* in the t-2 network). `lose11` and `add00` are the probabilities of losing or adding edges with histories 1, 1 and 0, 0, respectively. These probabilities are drawn from beta distributions, each of which is defined by two values (a and b, or 'shape1' and 'shape2' in the `rbeta()` function); thus, `lose11` and `add00` are each vectors of length 2. The value for each edge is drawn from a binomial distribution using `rbinom()`, with the `prob` argument either equal to `lose01` or `add10` or drawn from the beta distribution defined by `add00` or `lose11` . To establish baseline network dynamics, this process of edge assignment continues for a number of time steps specified as `burn.in`. Then, one additional time step is added, from which nodes will be removed in the next phase.
+
+<!--# How was the beta vs. uniform thing determined? -->
+
+### Removal
+
+Next, `n.removed` nodes are removed from the network, along with all of their edges. By default, the removed nodes are chosen randomly, though the model contains an `id` parameter that can be used to optionally specify the identities of `n.removed` particular nodes. Thus, the network at time step `burn.in + 1` contains `N - n.removed` individuals, as will the networks at all subsequent time steps.
+
+### Rewiring
+
+Rewiring is the process of individuals establishing new social connections (or, in a weighted network, strengthening existing ones) following node loss. [@farine2021] describes a pattern of "second-degree rewiring" in a network of songbirds following flockmate loss, whereby individuals with ties to the lost individual are more likely to form new connections *with each other* than with other individuals.
+
+### Model parameters and parameterization
+
+    N = 50, # Number of nodes in the starting network. Must be an integer > 2. Default is 50.
+                         n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
+                         edge.prob = 0.04, # Initial edge probability. This is derived from the average network density, when taking a 5-day increment, from parameterizingTheModel.Rmd.
+                         burn.in = 20, # How many iterations of baseline dynamics to run before node removals.
+                         recovery = 10, # How many iterations of baseline dynamics to run after node removals.
+                         add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
+                         lose01 = 0.3, # Probability of losing an edge with history h01. Derived from real data.
+                         add10 = 0.2, # Probability of gaining an edge with history h10. Derived from real data.
+                         lose11 = c(0.3283134, 0.3062181),
+                         id = NULL,
+                         coefAdd = 1,
+                         coefLose = -1
 
 Parameterization: used a certain subset of the data to determine beta distributions.
 
 ### Baseline model dynamics
+
 ### Loss of individuals
+
 ### Rewiring mechanism
 
+# Results
 
-
-# Results	
-Discussion	
+Discussion
