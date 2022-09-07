@@ -22,7 +22,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                      id = NULL,
                      coefAdd = 1,
                      coefLose = -1){ # beta distribution parameters derived from parameterizingTheModel.Rmd.)
-
+  
   # ARGUMENT CHECKS ---------------------------------------------------------
   checkmate::assertInteger(as.integer(N), lower = 2, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(n.removed), lower = 0, upper = N-1, any.missing = FALSE, len = 1)
@@ -38,16 +38,26 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   }
   checkmate::assertNumeric(coefAdd, len = 1, any.missing = FALSE)
   checkmate::assertNumeric(coefLose, len = 1, any.missing = FALSE)
-
+  
   # BURN-IN -----------------------------------------------------------------
+  ## Setup: assign individual sociabilities
+  ## By trial and error (using this app https://homepage.divms.uiowa.edu/~mbognar/applets/beta.html), I found alpha (14) and beta (8) parameters for a beta distribution that yields a mean of approximately 0.63 and seems to have a reasonable spread (this is based on nothing besides eyeballing it, to be totally honest).
+  ## Why do I want the mean to be 0.63? Because initially I had the network density at 0.4, and the square root of 0.4 is around 0.63. If I'm right about this, drawing sociabilities from a distribution centered around 0.63 and then randomly interacting those individuals should yield an overall network density of around 0.4. Let's test it out.
+  soc <- data.frame(indiv = 1:N,
+                    sociability = rbeta(N, shape1 = 14, shape2 = 8))
+  probMatrix <- soc$sociability %*% t(soc$sociability)
+  
   ## Empty list to hold networks
   network.history <- vector(mode = "list", length = burn.in + 1)
-  ## Create first two networks
-  network.history[[1]] <- matrix(0, N, N) # Blank network to enable looking 2 timesteps back # XXX is there a reason this has to be blank? why can't [[1]] and [[2]] both be random graphs with no relation to each other? Think on this.
-  network.history[[2]] <- sna::rgraph(N, tprob = edge.prob, 
-                                      mode = "graph") # random starting network
   
-  ## Create the rest of the burn-in-period networks, starting at the 3rd element.
+  ## Create random networks for the first two time steps 
+  network.history[[1]] <- sna::symmetrize(matrix(rbinom(N*N, 1, probMatrix), N, N), 
+                                          rule = "upper")
+  network.history[[2]] <- sna::symmetrize(matrix(rbinom(N*N, 1, probMatrix), N, N), 
+                                          rule = "upper")
+  ## Starting at element 3, 
+  
+  ## {to remove} Create the rest of the burn-in-period networks, starting at the 3rd element.
   ## The last element (network.history[[burn.in+1]]) is the one that will be modified by removing node(s).
   for(i in 3:(burn.in+1)){
     output <- update.network(ind = i, network.history, add00 = add00, 
@@ -65,20 +75,20 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   }else{
     del <- id
   }
-
+  
   # REMOVE NODES ------------------------------------------------------------
   network.history[["removed"]][del,] <- NA # set rows to NA
   network.history[["removed"]][,del] <- NA # set cols to NA
-
+  
   # SEE FRIENDS OF REMOVED NODES ----------------------------------------
   ## Note: decided that for now, we're considering "friends" to be "the ones what were connected to the now-removed node(s) in timestep `back1`", as opposed to "the ones that would have been connected to the now-removed node(s) in timestep `removed`. I'm not positive that this is correct, but I'm going with it for now.
   friendships <- network.history[["back1"]][del,]
   if(n.removed == 1){ # if we only removed one individual, `friendships` is a vector. Have to convert it back to a matrix.
     friendships <- matrix(friendships, nrow = 1, byrow = TRUE)
   } # if we removed more than one individual, `friendships` is already a matrix.
-
+  
   # REWIRING ----------------------------------------------------------------
-    ## CALCULATE BEREAVEMENT ---------------------------------------------------
+  ## CALCULATE BEREAVEMENT ---------------------------------------------------
   ## What proportion of its friends did each individual lose?
   nFriendsLost <- colSums(friendships)
   nFriendsHad <- colSums(network.history[["back1"]]) # XXX but see, this still isn't making sense to me. Because then where do the connections from network.history[["removed"]] fit?? Come back to this.
@@ -87,8 +97,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   propFriendsLost[del] <- NA # set NA's for the removed nodes
   propFriendsLostDF <- data.frame(node = 1:length(propFriendsLost),
                                   propFriendsLost = propFriendsLost)
-
-    ## CALCULATE BASELINE PROBABILITIES ----------------------------------------
+  
+  ## CALCULATE BASELINE PROBABILITIES ----------------------------------------
   back1 <- network.history[["back1"]]
   removed <- network.history[["removed"]]
   
@@ -104,7 +114,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                                     history == "h11" ~ rbeta(1, shape1 = lose11[1], shape2 = lose11[2]),
                                     history == "h01" ~ lose01))
   
-    ## MODIFY PROBS WITH INFORMATION ABOUT FRIENDS LOST ------------------------
+  ## MODIFY PROBS WITH INFORMATION ABOUT FRIENDS LOST ------------------------
   # Join information about how many friends each individual lost (need to do two joins, since there are two individuals involved in each edge.)
   allEdges <- allEdges %>%
     left_join(., propFriendsLostDF, by = c("from" = "node")) %>%
@@ -119,19 +129,19 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                                TRUE ~ baselineProb)) # XXX change this to NA so it's clearer if something actually has gone wrong.
   # XXX add a check to make sure there are no NA's--there should be none.
   
-    ## DRAW NEW EDGES ----------------------------------------------------------
+  ## DRAW NEW EDGES ----------------------------------------------------------
   newEdges <- suppressWarnings(rbinom(1:nrow(allEdges), 1, prob = allEdges$newProb))
   #  note that all these probabilities have been converted to probabilities of "success", aka probability of the edge *existing*.
   allEdges$rewired <- newEdges
   
-    ## CREATE ADJ MATRIX FOR REWIRED NETWORK -----------------------------------
+  ## CREATE ADJ MATRIX FOR REWIRED NETWORK -----------------------------------
   rewired <- removed # initialize network of same size
   rewired[as.matrix(allEdges[,c("from", "to")])] <- allEdges$rewired
   
-    ## SYMMETRIZE REWIRED NETWORK ----------------------------------------------
+  ## SYMMETRIZE REWIRED NETWORK ----------------------------------------------
   rewired <- as.matrix(sna::symmetrize(rewired, rule = "upper"))
   
-    ## MAKE SURE ALL EDGES THAT SHOULD BE NA ARE NA ----------------------------
+  ## MAKE SURE ALL EDGES THAT SHOULD BE NA ARE NA ----------------------------
   rewired[del,] <- NA # set rows to NA
   rewired[,del] <- NA # set cols to NA
   
@@ -153,7 +163,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
     colnames(x) <- paste0("v", 1:ncol(x))
     return(x)
   })
-
+  
   # REMOVE DELETED NODES -------------------------------------------------------
   ## (instead of just setting them to NA)
   ## If we don't do this, then they will just be treated as isolated nodes, which isn't what we need to do.
