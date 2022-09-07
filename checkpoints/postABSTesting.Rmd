@@ -27,30 +27,32 @@ source(here("modelFunction_rewiring.R"))
 ```{r code_folding = F}
 # Define parameters
 N = 50
-edge.prob <- 0.04
+socAlpha = 10
+socBeta = 20
 n.removed = 10
 burn.in = 20
 recovery = 5
-add00 = c(0.5, 10)
-lose01 = 0.1
-add10 = 0.05
-lose11 = c(0.5, 0.5)
-coefAdd = 0.5
-coefLose = -0.5
+mod00 = -0.2
+mod01 = 0.1
+mod10 = -0.1
+mod11 = 0.2
+coefGain = 0.5
+coefKeep = -0.5
 ```
 
 ```{r}
 modelGraphs <- runModel(N = N, # Nodes in the network
-                        edge.prob = edge.prob,
+                        socAlpha = socAlpha,
+                        socBeta = socBeta,
                         n.removed = n.removed,
                         burn.in = burn.in,
                         recovery = recovery,
-                        add00 = add00, 
-                        lose01 = lose01, 
-                        add10 = add10,
-                        lose11 = lose11,
-                        coefAdd = coefAdd,
-                        coefLose = coefLose)$graphs
+                        mod00 = mod00, 
+                        mod11 = mod11, 
+                        mod10 = mod10, 
+                        mod01 = mod01,
+                        coefGain = coefGain,
+                        coefKeep = coefKeep)$graphs
 
 ```
 
@@ -133,16 +135,17 @@ nRuns <- 500
 modelRuns <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
   modelRuns[[i]] <- runModel(N = 50, # Nodes in the network
-                             edge.prob = edge.prob,
+                             socAlpha = socAlpha,
+                             socBeta = socBeta,
                              n.removed = n.removed,
                              burn.in = burn.in,
                              recovery = recovery,
-                             add00 = add00, 
-                             lose01 = lose01, 
-                             add10 = add10,
-                             lose11 = lose11,
-                             coefAdd = coefAdd,
-                             coefLose = coefLose)$graphs
+                             mod00 = mod00, 
+                             mod01 = mod01, 
+                             mod10 = mod10,
+                             mod11 = mod11,
+                             coefGain = coefGain,
+                             coefKeep = coefKeep)$graphs
 }
 ```
 

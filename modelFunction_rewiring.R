@@ -12,6 +12,8 @@ source(here("supportingFunctions.R")) # all the functions that will be used in t
 # MODEL FUNCTION DEF ------------------------------------------------------
 runModel <- function(N = 50, # Number of nodes in the starting network. Must be an integer > 2. Default is 50.
                      n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
+                     socAlpha = 14,
+                     socBeta = 8,
                      burn.in = 20, # How many iterations of baseline dynamics to run before node removals.
                      recovery = 10, # How many iterations of baseline dynamics to run after node removals.
                      mod00 = -0.2, 
@@ -24,6 +26,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   
   # ARGUMENT CHECKS ---------------------------------------------------------
   checkmate::assertInteger(as.integer(N), lower = 2, any.missing = FALSE, len = 1)
+  checkmate::assertNumeric(socAlpha, len = 1, lower = 0)
+  checkmate::assertNumeric(socBeta, len = 1, lower = 0)
   checkmate::assertInteger(as.integer(n.removed), lower = 0, upper = N-1, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(burn.in), lower = 2, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(recovery), lower = 0, any.missing = FALSE, len = 1)
@@ -42,7 +46,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   ## By trial and error (using this app https://homepage.divms.uiowa.edu/~mbognar/applets/beta.html), I found alpha (14) and beta (8) parameters for a beta distribution that yields a mean of approximately 0.63 and seems to have a reasonable spread (this is based on nothing besides eyeballing it, to be totally honest).
   ## Why do I want the mean to be 0.63? Because initially I had the network density at 0.4, and the square root of 0.4 is around 0.63. If I'm right about this, drawing sociabilities from a distribution centered around 0.63 and then randomly interacting those individuals should yield an overall network density of around 0.4. Let's test it out.
   soc <- data.frame(indiv = 1:N,
-                    sociability = rbeta(N, shape1 = 14, shape2 = 8))
+                    sociability = rbeta(N, shape1 = socAlpha, shape2 = socBeta))
   probMatrix <- soc$sociability %*% t(soc$sociability)
   
   ## Empty list to hold networks
@@ -135,7 +139,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   newProbMatrix[newProbMatrix > 1] <- 1
   
   ## CREATE ADJ MATRIX FOR REWIRED NETWORK -----------------------------------
-  rewiredAdj <- matrix(rbinom(N*N, 1, newProbMatrix), N, N)
+  rewiredAdj <- suppressWarnings(matrix(rbinom(N*N, 1, newProbMatrix), N, N))
   
   ## SYMMETRIZE REWIRED NETWORK ----------------------------------------------
   rewiredAdj <- as.matrix(sna::symmetrize(rewiredAdj, rule = "upper"))
@@ -175,7 +179,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   # MAKE GRAPHS -------------------------------------------------------------
   ## Make the graphs (now with the right number of nodes)
   graphs <- lapply(network.history.nodesRemoved, function(x){
-    igraph::graph_from_adjacency_matrix(x, mode = "undirected", add.colnames = "label")
+    igraph::graph_from_adjacency_matrix(x, mode = "undirected", diag = FALSE, add.colnames = "label")
   })
   
   # RETURN OUTPUTS AS LIST --------------------------------------------------
