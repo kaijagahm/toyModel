@@ -130,40 +130,6 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   newProbMatrix[h01] <- newProbMatrix[h01]+(newProbMatrix[h01]*coefKeep*bereavementMatrix[h01])
   newProbMatrix[h11] <- newProbMatrix[h11]+(newProbMatrix[h11]*coefKeep*bereavementMatrix[h11])
   
-  ## XXX Testing whether this is even a reasonable way to rewire
-  id <- baselineProbMatrix
-  id[h00] <- "h00"
-  id[h01] <- "h01"
-  id[h10] <- "h10"
-  id[h11] <- "h11"
-  id[!grepl("h", id)] <- NA
-  
-  df <- data.frame(id = as.vector(id),
-                   baseline = as.vector(baselineProbMatrix),
-                   new = as.vector(newProbMatrix),
-                   bereavement = as.vector(bereavementMatrix)) %>%
-    filter(!is.na(id))
-  
-  df %>% ggplot(aes(x = baseline, y = new, col = bereavement))+
-    geom_point(aes(shape = id))+
-    #geom_smooth(method = "lm", se = F, col = "black", size = 0.5)+
-    geom_abline(slope = 1, intercept = 0, lty = 2)
-  # Conclusion: all probabilities increased at least a little, which would imply that all edges were affected by at least one bereaved individual. Test this:
-  summary(df$bereavement) # indeed, the minimum bereavement value for an edge is greater than 0. All edges involved at least one individual that lost at least one of its friends. This won't necessarily be true if the network is larger or if there are fewer individuals lost.
-  # As a result, the density of the network is going to increase immediately after the loss/rewiring. This is just an artifact of everyone having lost friends, I think. Density should increase less when bereavement is less widespread/common.
-  
-  df %>%
-    ggplot(aes(x = bereavement, y = new - baseline, col = baseline))+
-    geom_point(aes(shape = id))+
-    ylab("delta")
-  # Conclusion: the higher the baseline probability, the greater the EFFECT of losing friends (i.e. baseline increases more). Fan-shaped graph.
-  # I'm not sure whether this is biologically correct. 
-  
-   #XXX stop here
-  
-
-
-  
   ## DRAW NEW EDGES ----------------------------------------------------------
   newEdges <- suppressWarnings(rbinom(1:nrow(allEdges), 1, prob = allEdges$newProb))
   #  note that all these probabilities have been converted to probabilities of "success", aka probability of the edge *existing*.
