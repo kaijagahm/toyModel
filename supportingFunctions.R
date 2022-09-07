@@ -41,18 +41,21 @@ dedup <- function(mat, triangle = "upper"){
 # Repeat this number of times specified for desired burn.in, in a for loop. Each time, spitting out the network, and the history of the edges.
 update.network <- function(ind, # starting index for the history list.
                            network.history, # list of history, since this function depends on being able to look a few timesteps back.
-                           add00 = c(0.5, 7), 
-                           lose01 = 0.3, 
-                           add10 = 0.3, 
-                           lose11 = c(0.3, 0.3)){ 
+                           mod00 = -0.2, 
+                           mod11 = 0.2, 
+                           mod10 = -0.1, 
+                           mod01 = 0.1,
+                           probMatrix = NULL){ 
   
   # argument checks
-  checkmate::assertNumeric(add00, len = 2)
-  checkmate::assertNumeric(lose11, len = 2)
-  checkmate::assertNumeric(lose01, len = 1)
-  checkmate::assertNumeric(add10, len = 1)
+  checkmate::assertNumeric(mod00, len = 1)
+  checkmate::assertNumeric(mod11, len = 1)
+  checkmate::assertNumeric(mod10, len = 1)
+  checkmate::assertNumeric(mod01, len = 1)
   checkmate::assertList(network.history)
   checkmate::assertNumeric(ind, len = 1)
+  N <- nrow(network.history[[ind-1]])
+  checkmate::assertMatrix(probMatrix, null.ok = FALSE, nrows = N, ncols = N)
   
   # Establish a network history, two steps back
   if(ind == 1){
@@ -62,34 +65,33 @@ update.network <- function(ind, # starting index for the history list.
     # create a matrix of zeroes if the history doesn't exist that far back
     prevprev <- matrix(data = 0, 
                        nrow = nrow(prev), ncol = ncol(prev))
-    new <- prev
   }else if(ind > 2){
     prev <- network.history[[ind-1]]
     prevprev <- network.history[[ind-2]]
-    new <- prev
   }
+  new <- probMatrix
   
   # sort edges by history, two back
   h00 <- dedup(which(prev == prevprev & prev == 0, arr.ind = T), "upper")
   h11 <- dedup(which(prev == prevprev & prev == 1, arr.ind = T), "upper")
   h01 <- dedup(which(prevprev < prev, arr.ind = T), "upper")
   h10 <- dedup(which(prevprev > prev, arr.ind = T), "upper")
-  N <- nrow(prev)
 
-  # Modify the new adjacency matrix (upper triangle only)
-  new[h00] <- rbinom(n = nrow(h00), size = 1, 
-                     prob = rbeta(n = nrow(h00), 
-                                  shape1 = add00[1], shape2 = add00[2]))
-  new[h11] <- rbinom(n = nrow(h11), size = 1,
-                     prob = rbeta(n = nrow(h11),
-                                  shape1 = lose11[1], shape2 = lose11[2]))
-  new[h01] <- rbinom(n = nrow(h01), size = 1,
-                     prob = lose01)
-  new[h10] <- rbinom(n = nrow(h10), size = 1,
-                     prob = add10)
+  # Modify the new probability matrix (upper triangle only)
+  new[h00] <- new[h00]+(new[h00]*mod00)
+  new[h11] <- new[h11]+(new[h11]*mod11)
+  new[h10] <- new[h10]+(new[h10]*mod10)
+  new[h01] <- new[h01]+(new[h01]*mod01)
+  
+  # Fix any probabilities that are too small or too big
+  new[new > 1] <- 1
+  new[new < 0] <- 0
+  
+  # Create adjacency matrix using rbinom
+  newAdj <- matrix(rbinom(N*N, 1, new), N, N)
   
   # Symmetrize the matrix
-  new <- as.matrix(sna::symmetrize(new, rule = "upper")) # copy the upper triangle over the lower triangle
+  newAdj <- as.matrix(sna::symmetrize(newAdj, rule = "upper")) # copy the upper triangle over the lower triangle
   
-  return(new)
+  return(newAdj)
 }
