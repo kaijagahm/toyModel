@@ -45,7 +45,8 @@ update.network <- function(ind, # starting index for the history list.
                            mod11 = 0.2, 
                            mod10 = -0.1, 
                            mod01 = 0.1,
-                           probMatrix = NULL){ 
+                           probMatrix = NULL,
+                           returnProbs = FALSE){ 
   
   # argument checks
   checkmate::assertNumeric(mod00, len = 1)
@@ -87,11 +88,15 @@ update.network <- function(ind, # starting index for the history list.
   new[new > 1] <- 1
   new[new < 0] <- 0
   
-  # Create adjacency matrix using rbinom
-  newAdj <- matrix(rbinom(N*N, 1, new), N, N)
-  
-  # Symmetrize the matrix
-  newAdj <- as.matrix(sna::symmetrize(newAdj, rule = "upper")) # copy the upper triangle over the lower triangle
-  
-  return(newAdj)
+  if(returnProbs){
+    return(new)
+  }else{
+    # Create adjacency matrix using rbinom
+    newAdj <- matrix(rbinom(N*N, 1, new), N, N)
+    
+    # Symmetrize the matrix
+    newAdj <- as.matrix(sna::symmetrize(newAdj, rule = "upper")) # copy the upper triangle over the lower triangle
+    
+    return(newAdj)
+  }
 }
