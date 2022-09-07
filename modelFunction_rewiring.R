@@ -70,7 +70,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   network.history[["removed"]][del,] <- NA # set rows to NA
   network.history[["removed"]][,del] <- NA # set cols to NA
 
-  # SEE FRIENDS OF NOW-REMOVED NODES ----------------------------------------
+  # SEE FRIENDS OF REMOVED NODES ----------------------------------------
   ## Note: decided that for now, we're considering "friends" to be "the ones what were connected to the now-removed node(s) in timestep `back1`", as opposed to "the ones that would have been connected to the now-removed node(s) in timestep `removed`. I'm not positive that this is correct, but I'm going with it for now.
   friendships <- network.history[["back1"]][del,]
   if(n.removed == 1){ # if we only removed one individual, `friendships` is a vector. Have to convert it back to a matrix.
