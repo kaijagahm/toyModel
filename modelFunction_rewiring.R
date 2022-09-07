@@ -55,13 +55,16 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                                           rule = "upper")
   network.history[[2]] <- sna::symmetrize(matrix(rbinom(N*N, 1, probMatrix), N, N), 
                                           rule = "upper")
-  ## Starting at element 3, 
   
-  ## {to remove} Create the rest of the burn-in-period networks, starting at the 3rd element.
+  ## Starting at element 3, update the probMatrix with the `mod` values. Then create new adjacency matrices.
   ## The last element (network.history[[burn.in+1]]) is the one that will be modified by removing node(s).
   for(i in 3:(burn.in+1)){
-    output <- update.network(ind = i, network.history, add00 = add00, 
-                             add10 = add10, lose01 = lose01, lose11 = lose11)
+    output <- update.network(ind = i, network.history, 
+                             mod00 = mod00, 
+                             mod11 = mod11, 
+                             mod10 = mod10, 
+                             mod01 = mod01,
+                             probMatrix = probMatrix)
     network.history[[i]] <- output # update history
   }
   
@@ -80,54 +83,86 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   network.history[["removed"]][del,] <- NA # set rows to NA
   network.history[["removed"]][,del] <- NA # set cols to NA
   
-  # SEE FRIENDS OF REMOVED NODES ----------------------------------------
-  ## Note: decided that for now, we're considering "friends" to be "the ones what were connected to the now-removed node(s) in timestep `back1`", as opposed to "the ones that would have been connected to the now-removed node(s) in timestep `removed`. I'm not positive that this is correct, but I'm going with it for now.
-  friendships <- network.history[["back1"]][del,]
-  if(n.removed == 1){ # if we only removed one individual, `friendships` is a vector. Have to convert it back to a matrix.
-    friendships <- matrix(friendships, nrow = 1, byrow = TRUE)
-  } # if we removed more than one individual, `friendships` is already a matrix.
+  # SEE CONNECTIONS OF REMOVED NODES ----------------------------------------
+  ## Note: decided that for now, we're considering "connections" to be "the individuals what were connected to the now-removed node(s) in timestep `back1`", as opposed to "the individuals that would have been connected to the now-removed node(s) in timestep `removed`. I'm not positive that this is correct, but I'm going with it for now.
+  conns <- network.history[["back1"]][del,]
+  if(n.removed == 1){ # if we only removed one individual, `conns` is a vector. Have to convert it back to a matrix.
+    conns <- matrix(conns, nrow = 1, byrow = TRUE)
+  } # if we removed more than one individual, `conns` is already a matrix.
   
   # REWIRING ----------------------------------------------------------------
   ## CALCULATE BEREAVEMENT ---------------------------------------------------
-  ## What proportion of its friends did each individual lose?
-  nFriendsLost <- colSums(friendships)
-  nFriendsHad <- colSums(network.history[["back1"]]) # XXX but see, this still isn't making sense to me. Because then where do the connections from network.history[["removed"]] fit?? Come back to this.
-  propFriendsLost <- nFriendsLost/nFriendsHad
-  propFriendsLost[is.nan(propFriendsLost)] <- 0
-  propFriendsLost[del] <- NA # set NA's for the removed nodes
-  propFriendsLostDF <- data.frame(node = 1:length(propFriendsLost),
-                                  propFriendsLost = propFriendsLost)
+  ## What proportion of its connections did each individual lose?
+  nConnsLost <- colSums(conns)
+  nConnsHad <- colSums(network.history[["back1"]]) 
+  propConnsLost <- nConnsLost/nConnsHad
+  propConnsLost[is.nan(propConnsLost)] <- 0
+  propConnsLost[del] <- NA # set NA's for the removed nodes
+  propConnsLostDF <- data.frame(node = 1:length(propConnsLost),
+                                  propConnsLost = propConnsLost)
   
-  ## CALCULATE BASELINE PROBABILITIES ----------------------------------------
-  back1 <- network.history[["back1"]]
-  removed <- network.history[["removed"]]
+  ## CALCULATE BASELINE PROBABILITIES (sociability and history) ------------
+  baselineProbMatrix <- update.network(ind = which(names(network.history) == "removed") + 1,
+                                      network.history = network.history, 
+                                      mod00 = mod00, 
+                                      mod11 = mod11, 
+                                      mod10 = mod10, 
+                                      mod01 = mod01,
+                                      probMatrix = probMatrix,
+                                      returnProbs = TRUE) # return probabilities, instead of finished binomial matrix.
   
-  allEdges <- as.matrix(uniqueEdges(N))
-  rem <- removed[allEdges]
-  b1 <- back1[allEdges]
-  allEdges <- as.data.frame(allEdges) %>%
-    mutate(back1 = b1,
-           removed = rem) %>%
-    mutate(history = paste0("h", back1, removed),
-           baselineProb = case_when(history == "h00" ~ rbeta(1, shape1 = add00[1], shape2 = add00[2]),
-                                    history == "h10" ~ add10,
-                                    history == "h11" ~ rbeta(1, shape1 = lose11[1], shape2 = lose11[2]),
-                                    history == "h01" ~ lose01))
+  ## Matrix of sums of proportions of friends lost
+  bereavementMatrix <- outer(propConnsLost, propConnsLost, FUN = "+")
   
-  ## MODIFY PROBS WITH INFORMATION ABOUT FRIENDS LOST ------------------------
-  # Join information about how many friends each individual lost (need to do two joins, since there are two individuals involved in each edge.)
-  allEdges <- allEdges %>%
-    left_join(., propFriendsLostDF, by = c("from" = "node")) %>%
-    rename("mod1" = propFriendsLost) %>%
-    left_join(., propFriendsLostDF, by = c("to" = "node")) %>%
-    rename("mod2" = propFriendsLost) %>%
-    # XXX TALK THIS THROUGH WITH SOMEONE TO MAKE SURE IT'S CLEAR.
-    mutate(newProb = case_when(history %in% c("h00", "h10") ~ 
-                                 baselineProb + ((mod1+mod2)*coefAdd*baselineProb),
-                               history %in% c("h11", "h01") ~ 
-                                 1-(baselineProb + ((mod1+mod2)*coefLose*baselineProb)),
-                               TRUE ~ baselineProb)) # XXX change this to NA so it's clearer if something actually has gone wrong.
-  # XXX add a check to make sure there are no NA's--there should be none.
+  ## MODIFY PROBS WITH INFORMATION ABOUT CONNECTIONS LOST
+  # Define histories XXX this is redundant with the internal identification of histories in the `update.network` function.
+  prev <- network.history[["removed"]]
+  prevprev <- network.history[["back1"]]
+  h00 <- dedup(which(prev == prevprev & prev == 0, arr.ind = T), "upper")
+  h11 <- dedup(which(prev == prevprev & prev == 1, arr.ind = T), "upper")
+  h01 <- dedup(which(prevprev < prev, arr.ind = T), "upper")
+  h10 <- dedup(which(prevprev > prev, arr.ind = T), "upper")
+  
+  newProbMatrix <- baselineProbMatrix
+  
+  newProbMatrix[h00] <- newProbMatrix[h00]+(newProbMatrix[h00]*coefGain*bereavementMatrix[h00])
+  newProbMatrix[h10] <- newProbMatrix[h10]+(newProbMatrix[h10]*coefGain*bereavementMatrix[h10])
+  newProbMatrix[h01] <- newProbMatrix[h01]+(newProbMatrix[h01]*coefKeep*bereavementMatrix[h01])
+  newProbMatrix[h11] <- newProbMatrix[h11]+(newProbMatrix[h11]*coefKeep*bereavementMatrix[h11])
+  
+  ## XXX Testing whether this is even a reasonable way to rewire
+  id <- baselineProbMatrix
+  id[h00] <- "h00"
+  id[h01] <- "h01"
+  id[h10] <- "h10"
+  id[h11] <- "h11"
+  id[!grepl("h", id)] <- NA
+  
+  df <- data.frame(id = as.vector(id),
+                   baseline = as.vector(baselineProbMatrix),
+                   new = as.vector(newProbMatrix),
+                   bereavement = as.vector(bereavementMatrix)) %>%
+    filter(!is.na(id))
+  
+  df %>% ggplot(aes(x = baseline, y = new, col = bereavement))+
+    geom_point(aes(shape = id))+
+    #geom_smooth(method = "lm", se = F, col = "black", size = 0.5)+
+    geom_abline(slope = 1, intercept = 0, lty = 2)
+  # Conclusion: all probabilities increased at least a little, which would imply that all edges were affected by at least one bereaved individual. Test this:
+  summary(df$bereavement) # indeed, the minimum bereavement value for an edge is greater than 0. All edges involved at least one individual that lost at least one of its friends. This won't necessarily be true if the network is larger or if there are fewer individuals lost.
+  # As a result, the density of the network is going to increase immediately after the loss/rewiring. This is just an artifact of everyone having lost friends, I think. Density should increase less when bereavement is less widespread/common.
+  
+  df %>%
+    ggplot(aes(x = bereavement, y = new - baseline, col = baseline))+
+    geom_point(aes(shape = id))+
+    ylab("delta")
+  # Conclusion: the higher the baseline probability, the greater the EFFECT of losing friends (i.e. baseline increases more). Fan-shaped graph.
+  # I'm not sure whether this is biologically correct. 
+  
+   #XXX stop here
+  
+
+
   
   ## DRAW NEW EDGES ----------------------------------------------------------
   newEdges <- suppressWarnings(rbinom(1:nrow(allEdges), 1, prob = allEdges$newProb))
