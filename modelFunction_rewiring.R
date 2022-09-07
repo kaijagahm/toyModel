@@ -14,28 +14,28 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                      n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
                      burn.in = 20, # How many iterations of baseline dynamics to run before node removals.
                      recovery = 10, # How many iterations of baseline dynamics to run after node removals.
-                     add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
-                     lose01 = 0.3, # Probability of losing an edge with history h01. Derived from real data.
-                     add10 = 0.2, # Probability of gaining an edge with history h10. Derived from real data.
-                     lose11 = c(0.3283134, 0.3062181),
+                     mod00 = -0.2, 
+                     mod01 = 0.1, 
+                     mod10 = -0.1, 
+                     mod11 = 0.2,
                      id = NULL,
-                     coefAdd = 1,
-                     coefLose = -1){ # beta distribution parameters derived from parameterizingTheModel.Rmd.)
+                     coefGain = 0.5,
+                     coefKeep = 0.5){ # beta distribution parameters derived from parameterizingTheModel.Rmd.)
   
   # ARGUMENT CHECKS ---------------------------------------------------------
   checkmate::assertInteger(as.integer(N), lower = 2, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(n.removed), lower = 0, upper = N-1, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(burn.in), lower = 2, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(recovery), lower = 0, any.missing = FALSE, len = 1)
-  checkmate::assertNumeric(add00, len = 2, any.missing = FALSE)
-  checkmate::assertNumeric(lose01, len = 1, any.missing = FALSE, upper = 1, lower = 0)
-  checkmate::assertNumeric(add10, len = 1, any.missing = FALSE, upper = 1, lower = 0)
-  checkmate::assertNumeric(lose11, len = 2, any.missing = FALSE)
+  checkmate::assertNumeric(mod00, len = 1, any.missing = FALSE)
+  checkmate::assertNumeric(mod01, len = 1, any.missing = FALSE)
+  checkmate::assertNumeric(mod10, len = 1, any.missing = FALSE)
+  checkmate::assertNumeric(mod11, len = 1, any.missing = FALSE)
   if(!is.null(id)){
     checkmate::assertInteger(as.integer(id), len = n.removed, lower = 1, upper = N, unique = T)
   }
-  checkmate::assertNumeric(coefAdd, len = 1, any.missing = FALSE)
-  checkmate::assertNumeric(coefLose, len = 1, any.missing = FALSE)
+  checkmate::assertNumeric(coefGain, len = 1, any.missing = FALSE)
+  checkmate::assertNumeric(coefKeep, len = 1, any.missing = FALSE)
   
   # BURN-IN -----------------------------------------------------------------
   ## Setup: assign individual sociabilities
