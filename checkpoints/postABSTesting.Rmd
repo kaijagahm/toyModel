@@ -27,16 +27,16 @@ source(here("modelFunction_rewiring.R"))
 ```{r code_folding = F}
 # Define parameters
 N = 50
-socAlpha = 10
-socBeta = 20
+socAlpha = 2
+socBeta = 4
 n.removed = 10
-burn.in = 20
+burn.in = 10
 recovery = 5
-mod00 = -0.2
-mod01 = 0.1
-mod10 = -0.1
-mod11 = 0.2
-coefGain = 0.5
+mod00 = -0.4
+mod01 = 0.2
+mod10 = -0.2
+mod11 = 0.4
+coefGain = 0.5 # next step is to make these effects depend on the sociability and current situation of the individual.
 coefKeep = -0.5
 ```
 
@@ -56,73 +56,24 @@ modelGraphs <- runModel(N = N, # Nodes in the network
 
 ```
 
-## 2. For a single model run, examine network-level measures over time
+## 2. Do individuals have differentiable degrees over time?
 
-```{r echo = FALSE}
-# DENSITY
-densities <- lapply(modelGraphs, function(x){
-  edge_density(x)
-}) %>% 
-  unlist() %>% 
+```{r}
+df <- lapply(modelGraphs[1:burn.in], degree) %>%
+  do.call(rbind, .) %>%
   as.data.frame() %>%
-  setNames(., "density") %>%
-  mutate(slice = 1:length(modelGraphs))
+  mutate(timestep = 1:nrow(.)) %>%
+  pivot_longer(cols = -timestep, names_to = "id", values_to = "degree") %>%
+  group_by(id) %>%
+  mutate(initDegree = degree[1]) %>%
+  ungroup() %>%
+  mutate(id = as.numeric(stringr::str_remove(id, "V")))
 
-# Mean distance
-meanDistances <- lapply(modelGraphs, function(x){
-  mean_distance(x)
-}) %>% 
-  unlist() %>% 
-  as.data.frame() %>%
-  setNames(., "meanDistance") %>%
-  mutate(slice = 1:length(modelGraphs))
-
-# MODULARITY
-clustered <- lapply(modelGraphs, function(x){
-  x %>%
-    cluster_fast_greedy()
-}) 
-
-modularities <- data.frame(slice = 1:length(clustered),
-                           modularity = unlist(lapply(clustered, modularity)),
-                           nClusters = unlist(lapply(clustered, length)),
-                           nIndivs = unlist(lapply(modelGraphs, function(x){length(V(x))})))
-```
-
-```{r echo = FALSE}
-# Set some colors we can use consistently throughout
-densColor <- "#151FC6"
-moduColor <- "#C61578"
-mdColor <- "#C6BC15"
-
-# DENSITY
-densities %>%
-  ggplot(aes(x = slice, y = density))+
-  geom_line(col = densColor, size = 1)+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
-  ylab("Density")+
-  xlab("Time slice")
-
-meanDistances %>%
-  ggplot(aes(x = slice, y = meanDistance))+
-  geom_line(col = mdColor, size = 1)+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
-  ylab("Mean Distance")+
-  xlab("Time slice")
-
-modularities %>%
-  ggplot(aes(x = slice, y = modularity))+
-  geom_line(col = moduColor, size = 1)+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
-  ylab("Modularity")+
-  xlab("Time slice")
-
-modularities %>%
-  ggplot(aes(x = slice, y = nClusters))+
-  geom_line(col = moduColor, size = 1)+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.5, lty = 2)+
-  ylab("Number of clusters")+
-  xlab("Time slice")
+df %>%
+  ggplot(aes(x = timestep, y = degree, col = initDegree, group = id))+
+  geom_line()+
+  scale_color_viridis_c()
+# yes, we definitely see some individual differences in degree over time. The strenght of this effect depends on socAlpha and socBeta.
 ```
 
 ## 3. Trends for many model runs
@@ -205,7 +156,7 @@ densDF %>%
   xlab("Time slice")
 ```
 
-Density behaves the same no matter the number of individuals in the network, just with less variation. To be expected.
+There's no overall pattern to the effect of loss or rewiring on the network. Presumably, if loss or rewiring does have an effect, the extent of the effect will depend on which individuals were removed.
 
 ```{r echo = FALSE}
 mdDF %>%
