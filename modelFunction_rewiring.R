@@ -110,6 +110,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                                       mod01 = mod01,
                                       probMatrix = probMatrix,
                                       returnProbs = TRUE) # return probabilities, instead of finished binomial matrix.
+  baselineProbMatrix[del,] <- NA # set rows to NA
+  baselineProbMatrix[,del] <- NA # set cols to NA
   
   ## Matrix of sums of proportions of friends lost
   bereavementMatrix <- outer(propConnsLost, propConnsLost, FUN = "+")
@@ -130,32 +132,30 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   newProbMatrix[h01] <- newProbMatrix[h01]+(newProbMatrix[h01]*coefKeep*bereavementMatrix[h01])
   newProbMatrix[h11] <- newProbMatrix[h11]+(newProbMatrix[h11]*coefKeep*bereavementMatrix[h11])
   
-  ## DRAW NEW EDGES ----------------------------------------------------------
-  newEdges <- suppressWarnings(rbinom(1:nrow(allEdges), 1, prob = allEdges$newProb))
-  #  note that all these probabilities have been converted to probabilities of "success", aka probability of the edge *existing*.
-  allEdges$rewired <- newEdges
+  ## Fix probs < 0 or > 1
+  newProbMatrix[newProbMatrix < 0] <- 0
+  newProbMatrix[newProbMatrix > 1] <- 1
   
   ## CREATE ADJ MATRIX FOR REWIRED NETWORK -----------------------------------
-  rewired <- removed # initialize network of same size
-  rewired[as.matrix(allEdges[,c("from", "to")])] <- allEdges$rewired
+  rewiredAdj <- matrix(rbinom(N*N, 1, newProbMatrix), N, N)
   
   ## SYMMETRIZE REWIRED NETWORK ----------------------------------------------
-  rewired <- as.matrix(sna::symmetrize(rewired, rule = "upper"))
-  
-  ## MAKE SURE ALL EDGES THAT SHOULD BE NA ARE NA ----------------------------
-  rewired[del,] <- NA # set rows to NA
-  rewired[,del] <- NA # set cols to NA
-  
+  rewiredAdj <- as.matrix(sna::symmetrize(rewiredAdj, rule = "upper"))
+
   # ADD `REWIRED` TO NETWORK.HISTORY LIST --------------------------------------
-  network.history <- append(network.history, list("rewired" = rewired))
+  network.history <- append(network.history, list("rewired" = rewiredAdj))
   
   # CONTINUE BASELINE DYNAMICS UNTIL THE END -----------------------------------
   network.history <- append(network.history, rep(NA, recovery))
   names(network.history)[(which(names(network.history) == "rewired")+1):length(network.history)] <- paste0("recovery_", 1:recovery)
   
-  for(i in (burn.in+3):length(network.history)){
-    output <- update.network(ind = i, network.history, add00 = add00, 
-                             add10 = add10, lose01 = lose01, lose11 = lose11)
+  for(i in (burn.in+1):length(network.history)){
+    output <- update.network(ind = i, network.history, 
+                             mod00 = mod00, 
+                             mod11 = mod11, 
+                             mod10 = mod10, 
+                             mod01 = mod01,
+                             probMatrix = probMatrix)
     network.history[[i]] <- output # update history
   }
   
