@@ -17,13 +17,13 @@ knitr::opts_chunk$set(echo = FALSE)
 
 Eurasian griffon vultures (*Gyps fulvus,* hereafter "griffons" or "griffon vultures") are obligate scavengers [@ruxton2004] and social foragers [@harel2017]. This means that they feed exclusively on carcasses, and they locate these food sources largely by following other individuals---using social information to locate food is essential in an environment where food sources are both ephemeral and spatiotemporally unpredictable.
 
-However, vultures' tendency to aggregate at carcasses makes them particularly vulnerable to poisoning. Carcasses are sometimes poisoned deliberately, usually with pesticides, to target livestock predators or scavengers <!--# REF -->. Occasionally, deliberate poisonings are directed at vultures themselves, due to the mistaken belief that they kill livestock <!--# REF -->. Another source of poisoning is non-steroidal anti-inflammatory drugs (NSAIDs), which are often used for veterinary treatment of livestock and can be toxic to vultures <!--# REF -->. Death can sometimes occur within <!--# TIME PERIOD --> after ingesting poisoned carrion. Poisoning is a major threat to griffon vulture populations. It is the leading cause of death in the griffon population in Israel, where the species is locally endangered [@anglister2022]. It also threatens vulture species across the world [@ives2022a]. Crucially, because vultures gather to feed at carcasses, poisoned carcasses can kill many individuals within a very short time period. For example, on <!--# DATE --> in <!--# LOCATION -->, <!--# NUMBER --> of individuals died in a single poisoning event, and <!--# NUMBER --> more were transported to a wildlife hospital and successfully treated.
+However, vultures' tendency to aggregate at carcasses makes them particularly vulnerable to poisoning, usually from carcasses laced with pesticides, illegally deposited by farmers to target predators that threaten their livestock [@bbcnews2019]. Another source of poisoning is non-steroidal anti-inflammatory drugs (NSAIDs), which are often used for veterinary treatment of livestock and can be toxic to vultures [@anglister2022]. Poisoning is a major threat to griffon vulture populations. It is the leading cause of death in the griffon population in Israel, where the species is locally endangered [@anglister2022]. It also threatens vulture species across the world [@ives2022a]. Crucially, because vultures gather to feed at carcasses, poisoned carcasses can kill many individuals within a very short time period. For example, on 2021-10-24 in the southern part of Israel, 13 vultures died in a single poisoning event [@anglister2022a]. In 2019, a mass poisoning in the Golan Heights, in northern Israel, eight vultures were poisoned in one day, with two more transported to a wildlife hospital for treatment after they were found alive at the poisoned carcass site [@bbcnews2019a].
 
 ![A Eurasian Griffon Vulture (*Gyps fulvus*) and an Egyptian Vulture (*Neophron percnopterus*) feed at a carcass provided at a feeding site in Israel. Photo by Noa Pinter-Wollman.](images/feedingStationCarcass_pinterWollman.JPG){alt="A Eurasian Griffon Vulture (Gyps fulvus) and an Egyptian Vulture (Neophron percnopterus) feed at a carcass provided at a feeding site in Israel. Photo by Noa Pinter-Wollman."}
 
 ## Effects of mortality on social structure
 
-Mortality events such as those caused by poisoning affect not just the raw number of individuals in a population but also the population's social structure---the frequency and patterns of relationships between particular individuals. Social structure affects <!--# thing, ref --> and <!--# thing, ref -->, which are both of conservation concern. Therefore, it is important to understand how mortality affects these things.
+Mortality events such as those caused by poisoning affect not just the raw number of individuals in a population but also the population's social structure---the frequency and patterns of relationships between particular individuals. Social structure affects <!--# thing, ref --> and <!--# thing, ref -->, which are both of conservation concern. Therefore, it is important to understand how mortality might impact these processes.
 
 There has been considerable study in the social network literature of how removing a node affects the network structure <!--# maybe need to introduce the concept of social networks earlier? -->, with a particular focus on how the characteristics of the removed node mediate that effect. This literature has also explored how networks react to sequential removals of multiple nodes; for instance, <!--# REF --> finds that <!--# result having to do with network collapse after a certain point -->. In behavioral ecology, [@shizuka2020] has distinguished between different types of mortality or node removals, arguing that the response of the social network should be different in cases where mortality can be reasonably anticipated by individuals in the population (such as mortality due to sickness or old age) than in cases of unanticipated mortality (e.g. predation or anthropogenic causes like shooting or poisoning). However, the existing literature has not explored the results of the simultaneous loss of several individuals (as opposed to the loss of one individual or sequential loss of several).
 
@@ -41,7 +41,7 @@ In order to investigate the effects of multiple mortality on vulture social netw
 
 1.  How is the effect of multiple-node loss on network topology mediated by the number and identity of the lost nodes?
 
-2.  How does a social network rewire following the loss of multiple nodes? (XXX i.e. which hypothesis? But don't want to actually lay out the hypotheses yet because I'm not testing them yet, right? Or maybe I do...)
+2.  How does a social network rewire following the loss of multiple nodes?
 
 # Methods
 
@@ -94,29 +94,6 @@ p(add edge A-C) = 0.498
 So, node A having lost two of its three connections increases the probability of an edge developing between A and C by 66% in this case. If node C's affectedness had also been 0.66, then the probability for this edge would have increased by 132%, to 0.696. If `coefAdd` were smaller, the increase would be less in either case. Setting `coefAdd` (`coefLose`) to 0 indicates that losing connections does not affect the tendency of a node to form new edges (retain existing edges).
 
 Reversing the signs of `coefAdd` and `coefLose` would produce a scenario in which having lost more connections makes an individual *less*, not more, likely to form any given new edge, and more likely to lose an existing one.
-
-### Model parameters and parameterization
-
-    N = 50, # Number of nodes in the starting network. Must be an integer > 2. Default is 50.
-                         n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
-                         edge.prob = 0.04, # Initial edge probability. This is derived from the average network density, when taking a 5-day increment, from parameterizingTheModel.Rmd.
-                         burn.in = 20, # How many iterations of baseline dynamics to run before node removals.
-                         recovery = 10, # How many iterations of baseline dynamics to run after node removals.
-                         add00 = c(0.4721719, 7.3144796), # beta distribution parameters derived from parameterizingTheModel.Rmd.
-                         lose01 = 0.3, # Probability of losing an edge with history h01. Derived from real data.
-                         add10 = 0.2, # Probability of gaining an edge with history h10. Derived from real data.
-                         lose11 = c(0.3283134, 0.3062181),
-                         id = NULL,
-                         coefAdd = 1,
-                         coefLose = -1
-
-Parameterization: used a certain subset of the data to determine beta distributions.
-
-### Baseline model dynamics
-
-### Loss of individuals
-
-### Rewiring mechanism
 
 # Results
 
