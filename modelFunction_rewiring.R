@@ -58,6 +58,10 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   network.history[[2]] <- sna::symmetrize(matrix(rbinom(N*N, 1, probMatrix), N, N), 
                                           rule = "upper")
   
+  ## Set individuals' degree preferences based on this initial matrix
+  degreePreferences <- rowSums(network.history[[1]])
+  ## Now, at each timestep, going to adjust individuals' probabilities of interacting at each time step according to how far they are away from their preferred degree.
+
   ## Starting at element 3, update the probMatrix with the `mod` values. Then create new adjacency matrices.
   ## The last element (network.history[[burn.in+1]]) is the one that will be modified by removing node(s).
   for(i in 3:(burn.in+1)){
