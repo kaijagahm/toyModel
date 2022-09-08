@@ -46,7 +46,8 @@ update.network <- function(ind, # starting index for the history list.
                            mod10 = -0.1, 
                            mod01 = 0.1,
                            probMatrix = NULL,
-                           returnProbs = FALSE){ 
+                           returnProbs = FALSE,
+                           degreePrefs = NULL){ 
   
   # argument checks
   checkmate::assertNumeric(mod00, len = 1)
@@ -57,6 +58,7 @@ update.network <- function(ind, # starting index for the history list.
   checkmate::assertNumeric(ind, len = 1)
   N <- nrow(network.history[[ind-1]])
   checkmate::assertMatrix(probMatrix, null.ok = FALSE, nrows = N, ncols = N)
+  checkmate::assertNumeric(degreePrefs, null.ok = FALSE, len = N)
   
   # Establish a network history, two steps back
   if(ind == 1){
@@ -70,7 +72,14 @@ update.network <- function(ind, # starting index for the history list.
     prev <- network.history[[ind-1]]
     prevprev <- network.history[[ind-2]]
   }
-  new <- probMatrix
+  new <- probMatrix # XXX start here: need to import soc$sociality instead of probMatrix, then add probChanges below, THEN create probMatrix within this function (because it has to be created for each time step instead of being constant.)
+  
+  # Calculate how far each individual is from its preferred degree
+  prevDegrees <- rowSums(prev) 
+  degreeDiffs <- degreePrefs - prevDegrees
+  probChanges <- (degreeDiffs/N)*(N/degreePrefs)
+  probChanges[is.na(probChanges)|is.infinite(probChanges)] <- 0
+  
   
   # sort edges by history, two back
   h00 <- dedup(which(prev == prevprev & prev == 0, arr.ind = T), "upper")
