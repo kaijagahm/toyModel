@@ -36,8 +36,8 @@ mod00 = -0.4
 mod01 = 0.2
 mod10 = -0.2
 mod11 = 0.4
-coefGain = 0.5 # next step is to make these effects depend on the sociability and current situation of the individual.
-coefKeep = -0.5
+coefGain = -1 # next step is to make these effects depend on the sociability and current situation of the individual.
+coefKeep = -1
 ```
 
 ```{r}
@@ -73,7 +73,7 @@ df %>%
   ggplot(aes(x = timestep, y = degree, col = initDegree, group = id))+
   geom_line()+
   scale_color_viridis_c()
-# yes, we definitely see some individual differences in degree over time. The strenght of this effect depends on socAlpha and socBeta.
+# yes, we definitely see some individual differences in degree over time. The strength of this effect depends on socAlpha and socBeta.
 ```
 
 ## 3. Trends for many model runs
@@ -101,6 +101,9 @@ for(i in 1:nRuns){
 ```
 
 ```{r echo = FALSE}
+densColor <- "#151FC6"
+moduColor <- "#C61578"
+mdColor <- "#C6BC15"
 densDF <- lapply(modelRuns, function(x){
     lapply(x, function(y){
       edge_density(y)
@@ -148,7 +151,7 @@ densDF %>%
   mutate(avg = mean(density)) %>%
   ungroup() %>%
   ggplot(aes(x = slice, y = density))+
-  geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.1)+
+  geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
@@ -156,7 +159,7 @@ densDF %>%
   xlab("Time slice")
 ```
 
-There's no overall pattern to the effect of loss or rewiring on the network. Presumably, if loss or rewiring does have an effect, the extent of the effect will depend on which individuals were removed.
+There's no overall pattern to the effect of loss or rewiring on the network density. Presumably, if loss or rewiring does affect density, the extent of the effect will depend on which individuals were removed, or on some other factor. It isn't generalizable.
 
 ```{r echo = FALSE}
 mdDF %>%
@@ -164,14 +167,14 @@ mdDF %>%
   mutate(avg = mean(meanDistance)) %>%
   ungroup() %>%
   ggplot(aes(x = slice, y = meanDistance))+
-  geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.1)+
+  geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Mean Distance")+
   xlab("Time slice")
 ```
 
-Mean distance looks like it might have a nonlinear relationship with the number of individuals in the network. Need to investigate this further!
+In general, mean distance increases when individuals are removed, though it looks like there's a lot of variation in the extent of the increase, and there are some cases where it decreases.
 
 ```{r echo = FALSE}
 moduDF %>%
@@ -179,7 +182,7 @@ moduDF %>%
   mutate(avg = mean(modularity)) %>%
   ungroup() %>%
   ggplot(aes(x = slice, y = modularity))+
-  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.1)+
+  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Modularity")+
@@ -191,7 +194,7 @@ moduDF %>%
   ungroup() %>%
   filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nClusters/nIndivs))+
-  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.1)+
+  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Clusters per individual")+
@@ -203,14 +206,14 @@ moduDF %>%
   ungroup() %>%
   filter(slice > 3) %>%
   ggplot(aes(x = slice, y = nIndivs/nClusters))+
-  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.1)+
+  geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
   ylab("Individuals per cluster")+
   xlab("Time slice")
 ```
 
-Modularity seems to behave the same no matter the number of individuals in the network.
+Modularity generally increases when individuals are removed and declines again with rewiring, but that's not universally the case.
 
 ## 4. Relationship between removed nodes and network-level measures
 
@@ -299,7 +302,7 @@ full <- removedInfoSummary %>%
 
 A few sanity checks:
 
-```{r echo = FALSE}
+```{r echo = FALSE, include = FALSE}
 # Are degree and betweenness highly correlated?
 removedInfo %>%
   ggplot(aes(x = jitter(degree), y = btwn))+
@@ -391,7 +394,6 @@ plotElements = list(geom_point(shape = 1),
 # REMOVAL (REMOVED - BACK1)
 full %>%
   filter(change == "removal") %>%
-  mutate(label = paste0("|", label, "|")) %>%
   ggplot(aes(x = meanDeg, y = yMeasureValue))+
   geom_point(alpha = 0.5, shape = 1)+
   plotElements+
@@ -400,7 +402,6 @@ full %>%
 
 full %>%
   filter(change == "removal") %>%
-  mutate(label = paste0("|", label, "|")) %>%
   ggplot(aes(x = meanDist, y = yMeasureValue))+
   geom_point(alpha = 0.5, shape = 1)+
   plotElements+
@@ -409,7 +410,6 @@ full %>%
 
 full %>%
   filter(change == "removal") %>%
-  mutate(label = paste0("|", label, "|")) %>%
   ggplot(aes(x = meanNormalizedCloseness, y = yMeasureValue))+
   geom_point(alpha = 0.5, shape = 1)+
   plotElements+
@@ -419,7 +419,6 @@ full %>%
 # REWIRING (REWIRED - REMOVED)
 full %>%
   filter(change == "rewiring") %>%
-  mutate(label = paste0("|", label, "|")) %>%
   ggplot(aes(x = meanDeg, y = yMeasureValue))+
   geom_point(alpha = 0.5, shape = 1)+
   plotElements+
@@ -428,7 +427,6 @@ full %>%
 
 full %>%
   filter(change == "rewiring") %>%
-  mutate(label = paste0("|", label, "|")) %>%
   ggplot(aes(x = meanDist, y = yMeasureValue))+
   geom_point(alpha = 0.5, shape = 1)+
   plotElements+
@@ -437,7 +435,6 @@ full %>%
 
 full %>%
   filter(change == "rewiring") %>%
-  mutate(label = paste0("|", label, "|")) %>%
   ggplot(aes(x = meanNormalizedCloseness, y = yMeasureValue))+
   geom_point(alpha = 0.5, shape = 1)+
   plotElements+
