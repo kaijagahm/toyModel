@@ -21,8 +21,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                      mod10 = -0.1, 
                      mod11 = 0.2,
                      id = NULL,
-                     coefGain = 0.5,
-                     coefKeep = 0.5){ # beta distribution parameters derived from parameterizingTheModel.Rmd.)
+                     coefBereavement = 1){ # beta distribution parameters derived from parameterizingTheModel.Rmd.)
   
   # ARGUMENT CHECKS ---------------------------------------------------------
   checkmate::assertInteger(as.integer(N), lower = 2, any.missing = FALSE, len = 1)
@@ -38,9 +37,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   if(!is.null(id)){
     checkmate::assertInteger(as.integer(id), len = n.removed, lower = 1, upper = N, unique = T)
   }
-  checkmate::assertNumeric(coefGain, len = 1, any.missing = FALSE)
-  checkmate::assertNumeric(coefKeep, len = 1, any.missing = FALSE)
-  
+  checkmate::assertNumeric(coefBereavement, len = 1, any.missing = FALSE)
+
   # BURN-IN -----------------------------------------------------------------
   ## Setup: assign individual sociabilities
   ## By trial and error (using this app https://homepage.divms.uiowa.edu/~mbognar/applets/beta.html), I found alpha (14) and beta (8) parameters for a beta distribution that yields a mean of approximately 0.63 and seems to have a reasonable spread (this is based on nothing besides eyeballing it, to be totally honest).
@@ -103,22 +101,13 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   propConnsLostDF <- data.frame(node = 1:length(propConnsLost),
                                   propConnsLost = propConnsLost)
   
-  ## CALCULATE BASELINE PROBABILITIES (sociability and history) ------------
-  baselineProbMatrix <- update.network(ind = which(names(network.history) == "removed") + 1,
-                                      network.history = network.history, 
-                                      mod00 = mod00, 
-                                      mod11 = mod11, 
-                                      mod10 = mod10, 
-                                      mod01 = mod01,
-                                      probMatrix = probMatrix,
-                                      returnProbs = TRUE) # return probabilities, instead of finished binomial matrix.
-  baselineProbMatrix[del,] <- NA # set rows to NA
-  baselineProbMatrix[,del] <- NA # set cols to NA
+  ## Compute alterations to baseline probabilities based on loss, incorporating `coefBereavement`.
+  withLoss <- soc$sociability*(1+propConnsLost)*coefBereavement
   
-  ## Matrix of sums of proportions of friends lost
-  bereavementMatrix <- outer(propConnsLost, propConnsLost, FUN = "+")
+  # Compute new probability matrix
+  probMatrixWithLoss <- withLoss %*% t(withLoss)
   
-  ## MODIFY PROBS WITH INFORMATION ABOUT CONNECTIONS LOST
+  ## MODIFY PROBS WITH INFORMATION ABOUT EDGE HISTORY
   # Define histories XXX this is redundant with the internal identification of histories in the `update.network` function.
   prev <- network.history[["removed"]]
   prevprev <- network.history[["back1"]]
@@ -127,16 +116,12 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   h01 <- dedup(which(prevprev < prev, arr.ind = T), "upper")
   h10 <- dedup(which(prevprev > prev, arr.ind = T), "upper")
   
-  newProbMatrix <- baselineProbMatrix
+  newProbMatrix <- probMatrixWithLoss
   
-  newProbMatrix[h00] <- newProbMatrix[h00]+(newProbMatrix[h00]*coefGain*bereavementMatrix[h00])
-  newProbMatrix[h10] <- newProbMatrix[h10]+(newProbMatrix[h10]*coefGain*bereavementMatrix[h10])
-  newProbMatrix[h01] <- newProbMatrix[h01]+(newProbMatrix[h01]*coefKeep*bereavementMatrix[h01])
-  newProbMatrix[h11] <- newProbMatrix[h11]+(newProbMatrix[h11]*coefKeep*bereavementMatrix[h11])
-  
-  ## Fix probs < 0 or > 1
-  newProbMatrix[newProbMatrix < 0] <- 0
-  newProbMatrix[newProbMatrix > 1] <- 1
+  newProbMatrix[h00] <- newProbMatrix[h00]*(1+mod00)
+  newProbMatrix[h11] <- newProbMatrix[h11]*(1+mod11)
+  newProbMatrix[h01] <- newProbMatrix[h01]*(1+mod01)
+  newProbMatrix[h10] <- newProbMatrix[h10]*(1+mod10)
   
   ## CREATE ADJ MATRIX FOR REWIRED NETWORK -----------------------------------
   rewiredAdj <- suppressWarnings(matrix(rbinom(N*N, 1, newProbMatrix), N, N))
