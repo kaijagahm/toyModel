@@ -36,8 +36,7 @@ mod00 = -0.4
 mod01 = 0.2
 mod10 = -0.2
 mod11 = 0.4
-coefGain = -1 # next step is to make these effects depend on the sociability and current situation of the individual.
-coefKeep = -1
+coefBereavement = 1
 ```
 
 ```{r}
@@ -51,15 +50,13 @@ modelGraphs <- runModel(N = N, # Nodes in the network
                         mod11 = mod11, 
                         mod10 = mod10, 
                         mod01 = mod01,
-                        coefGain = coefGain,
-                        coefKeep = coefKeep)$graphs
-
+                        coefBereavement = coefBereavement)$graphs
 ```
 
 ## 2. Do individuals have differentiable degrees over time?
 
 ```{r}
-df <- lapply(modelGraphs[1:burn.in], degree) %>%
+df <- lapply(modelGraphs, degree) %>%
   do.call(rbind, .) %>%
   as.data.frame() %>%
   mutate(timestep = 1:nrow(.)) %>%
@@ -89,14 +86,14 @@ for(i in 1:nRuns){
                              socAlpha = socAlpha,
                              socBeta = socBeta,
                              n.removed = n.removed,
+                             id = NULL,
                              burn.in = burn.in,
                              recovery = recovery,
                              mod00 = mod00, 
                              mod01 = mod01, 
                              mod10 = mod10,
                              mod11 = mod11,
-                             coefGain = coefGain,
-                             coefKeep = coefKeep)$graphs
+                             coefBereavement)$graphs
 }
 ```
 
@@ -247,6 +244,14 @@ removedInfo <- lapply(modelRuns, function(x){
   removedDegrees <- degree(x[["back1"]])[removedNumbers]
   removedBetweennesses <- betweenness(x[["back1"]])[removedNumbers]
   
+  # Calculate "the extent to which the removed nodes constitute their own cluster"
+  membershipVec <- as.vector(V(x[[1]]))
+  membershipVec[removedNumbers] <- 1
+  membershipVec[-removedNumbers] <- 2
+  # created a cluster membership vector, assigning each of the removed nodes to cluster "1" and each of the remaining nodes to cluster "2"
+  
+  mod <- modularity(x[["back1"]], membership = membershipVec)
+  
   # Make edge list for calculating closenesses
   el <- get.edgelist(x[["back1"]], names = TRUE) %>%
     cbind(., 1) %>%
@@ -271,7 +276,8 @@ removedInfo <- lapply(modelRuns, function(x){
                    fullGraphDens = edge_density(x[["back1"]]),
                    btwn = removedBetweennesses,
                    dens = edge_density(removedGraph),
-                   meanDist = removedMeanDistance)
+                   meanDist = removedMeanDistance,
+                   mod = mod)
   df <- df %>%
     left_join(removedClosenesses, by = c("number" = "node"))
   
@@ -286,6 +292,7 @@ removedInfoSummary <- removedInfo %>%
   summarize(meanDeg = mean(degree, na.rm = T),
             meanBtwn = mean(btwn, na.rm = T),
             dens = dens[1],
+            mod = mod[1],
             fullGraphDens = fullGraphDens[1],
             meanDist = meanDist[1],
             meanCloseness = mean(closeness, na.rm = T),
@@ -302,7 +309,7 @@ full <- removedInfoSummary %>%
 
 A few sanity checks:
 
-```{r echo = FALSE, include = FALSE}
+```{r echo = FALSE}
 # Are degree and betweenness highly correlated?
 removedInfo %>%
   ggplot(aes(x = jitter(degree), y = btwn))+
@@ -377,6 +384,40 @@ full %>%
 # indeed, these are definitely correlated, though not as tightly as I would have assumed. I bet that's because of the reciprocal thing or the way the zeroes are calculated. The variation is probably largely attributable to variation in the number of isolated nodes. Indeed, this is confirmed by the smooth color gradient of mean degree. 
 
 # I checked out the graph for normalized closeness and it's exactly the same--that's because all of these networks have the same number of nodes. This suggests we should use normalized closeness, in case we want to compare across networks with different numbers of nodes later.
+
+# What is the overall modularity of the removed nodes? Should be a normal distribution, since the nodes were removed randomly.
+hist(removedInfoSummary$mod) # cool, this looks reasonable. Normal distribution centered around zero.
+
+# What is the relationship between the modularity and other measures?
+# Predict that when the nodes constitute more of a module, they will have a higher density
+removedInfoSummary %>%
+  ggplot(aes(x = mod, y = dens))+
+  geom_point(shape = 21)+
+  geom_smooth(method = "lm")
+
+# Predict that when the nodes constitute more of a module, they will have a lower mean closeness
+removedInfoSummary %>%
+  ggplot(aes(x = mod, y = meanNormalizedCloseness))+
+  geom_point(shape = 21)+
+  geom_smooth(method = "lm")
+# huh, there's no apparent relationship between these, and if there's any relationship at all it's in the opposite direction than I would have expected. I don't understand why that is.
+
+# What about degree and betweenness?
+# I predict no relationship between mean degree or mean betweenness and modularity
+removedInfoSummary %>%
+  ggplot(aes(x = mod, y = meanDeg))+
+  geom_point(shape = 21)+
+  geom_smooth(method = "lm") # as predicted, no relationship. Good! They're measuring different things.
+
+removedInfoSummary %>%
+  ggplot(aes(x = mod, y = meanBtwn))+
+  geom_point(shape = 21)+
+  geom_smooth(method = "lm") # okay, something of a negative relationship with betweenness. I guess that makes sense--nodes that are more out of the way might be more modular with each other and less well connected to the rest of the graph. But the relationship is weak.
+
+# So, it seems reasonable to use modularity as an addition to/alternative to mean degree or mean closeness.
+
+# I think mean closeness is actually a better measure of what I care about here. Q1: "how generally well-connected/central were the removed nodes on the network before they died?" and closeness is a fairly good measure of that that takes into account their closeness to others beyond their immediate neighbors.
+# For Q2: "how much of a clique did the removed individuals form (i.e. how separate were they from the rest of the network)?", modularity seems to be a fairly okay measure.
 ```
 
 ```{r echo = FALSE}
@@ -512,3 +553,12 @@ deltaRatios %>%
   xlab("Mean normalized closeness of removed nodes")+
   ggtitle("log(|Rewiring/Removal|od)")
 ```
+
+Gain vs. keep edges
+
+What proportion of previous edges did bereaved individuals keep? And did it change by how bereaved they were?
+
+```{r}
+
+```
+

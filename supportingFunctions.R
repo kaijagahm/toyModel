@@ -38,7 +38,7 @@ dedup <- function(mat, triangle = "upper"){
 
 # update.network ----------------------------------------------------------
 # Function for baseline network dynamics
-# Repeat this number of times specified for desired burn.in, in a for loop. Each time, spitting out the network, and the history of the edges.
+# Repeat this number of times specified for desired baseline.in, in a for loop. Each time, spitting out the network, and the history of the edges.
 update.network <- function(ind, # starting index for the history list.
                            network.history, # list of history, since this function depends on being able to look a few timesteps back.
                            mod00 = -0.2, 

@@ -14,8 +14,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                      n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
                      socAlpha = 14,
                      socBeta = 8,
-                     burn.in = 20, # How many iterations of baseline dynamics to run before node removals.
-                     recovery = 10, # How many iterations of baseline dynamics to run after node removals.
+                     baseline.in = 20, # How many iterations of baseline dynamics to run before node removals.
+                     baseline.out = 10, # How many iterations of baseline dynamics to run after node removals.
                      mod00 = -0.2, 
                      mod01 = 0.1, 
                      mod10 = -0.1, 
@@ -28,8 +28,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   checkmate::assertNumeric(socAlpha, len = 1, lower = 0)
   checkmate::assertNumeric(socBeta, len = 1, lower = 0)
   checkmate::assertInteger(as.integer(n.removed), lower = 0, upper = N-1, any.missing = FALSE, len = 1)
-  checkmate::assertInteger(as.integer(burn.in), lower = 2, any.missing = FALSE, len = 1)
-  checkmate::assertInteger(as.integer(recovery), lower = 0, any.missing = FALSE, len = 1)
+  checkmate::assertInteger(as.integer(baseline.in), lower = 2, any.missing = FALSE, len = 1)
+  checkmate::assertInteger(as.integer(baseline.out), lower = 0, any.missing = FALSE, len = 1)
   checkmate::assertNumeric(mod00, len = 1, any.missing = FALSE)
   checkmate::assertNumeric(mod01, len = 1, any.missing = FALSE)
   checkmate::assertNumeric(mod10, len = 1, any.missing = FALSE)
@@ -48,7 +48,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   probMatrix <- soc$sociability %*% t(soc$sociability)
   
   ## Empty list to hold networks
-  network.history <- vector(mode = "list", length = burn.in + 1)
+  network.history <- vector(mode = "list", length = baseline.in + 1)
   
   ## Create random networks for the first two time steps 
   network.history[[1]] <- sna::symmetrize(matrix(rbinom(N*N, 1, probMatrix), N, N), 
@@ -57,8 +57,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                                           rule = "upper")
   
   ## Starting at element 3, update the probMatrix with the `mod` values. Then create new adjacency matrices.
-  ## The last element (network.history[[burn.in+1]]) is the one that will be modified by removing node(s).
-  for(i in 3:(burn.in+1)){
+  ## The last element (network.history[[baseline.in+1]]) is the one that will be modified by removing node(s).
+  for(i in 3:(baseline.in+1)){
     output <- update.network(ind = i, network.history, 
                              mod00 = mod00, 
                              mod11 = mod11, 
@@ -69,8 +69,8 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   }
   
   # assign names so we can keep track of where the removal happened
-  names(network.history) <- c(paste0("history_", 1:(burn.in-2)), "back2", "back1", "removed")
-  # keep in mind that even though we've called the (burn.in+1)th slice "removed", it does not actually have the node(s) removed (aka set to NA) yet. We'll do that next.
+  names(network.history) <- c(paste0("history_", 1:(baseline.in-2)), "back2", "back1", "removed")
+  # keep in mind that even though we've called the (baseline.in+1)th slice "removed", it does not actually have the node(s) removed (aka set to NA) yet. We'll do that next.
   
   # SELECT WHICH NODES TO REMOVE --------------------------------------------
   if(is.null(id)){
@@ -133,10 +133,10 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   network.history <- append(network.history, list("rewired" = rewiredAdj))
   
   # CONTINUE BASELINE DYNAMICS UNTIL THE END -----------------------------------
-  network.history <- append(network.history, rep(NA, recovery))
-  names(network.history)[(which(names(network.history) == "rewired")+1):length(network.history)] <- paste0("recovery_", 1:recovery)
+  network.history <- append(network.history, rep(NA, baseline.out))
+  names(network.history)[(which(names(network.history) == "rewired")+1):length(network.history)] <- paste0("baseline.out_", 1:baseline.out)
   
-  for(i in (burn.in+1):length(network.history)){
+  for(i in (baseline.in+1):length(network.history)){
     output <- update.network(ind = i, network.history, 
                              mod00 = mod00, 
                              mod11 = mod11, 
@@ -156,7 +156,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   ## (instead of just setting them to NA)
   ## If we don't do this, then they will just be treated as isolated nodes, which isn't what we need to do.
   network.history.nodesRemoved <- network.history
-  for(i in (burn.in+1):length(network.history.nodesRemoved)){
+  for(i in (baseline.in+1):length(network.history.nodesRemoved)){
     network.history.nodesRemoved[[i]] <- network.history.nodesRemoved[[i]][-del,] # remove rows
     network.history.nodesRemoved[[i]] <- network.history.nodesRemoved[[i]][,-del] # remove cols
   }
