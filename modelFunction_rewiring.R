@@ -12,8 +12,7 @@ source(here("supportingFunctions.R")) # all the functions that will be used in t
 # MODEL FUNCTION DEF ------------------------------------------------------
 runModel <- function(N = 50, # Number of nodes in the starting network. Must be an integer > 2. Default is 50.
                      n.removed = 1, # Number of nodes to remove. Must be an integer >= 0 and <= N-1. Default is 1.
-                     socAlpha = 14,
-                     socBeta = 8,
+                     mnSocExp = 0.3,
                      baseline.in = 20, # How many iterations of baseline dynamics to run before node removals.
                      baseline.out = 10, # How many iterations of baseline dynamics to run after node removals.
                      mod00 = -0.2, 
@@ -25,8 +24,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   
   # ARGUMENT CHECKS ---------------------------------------------------------
   checkmate::assertInteger(as.integer(N), lower = 2, any.missing = FALSE, len = 1)
-  checkmate::assertNumeric(socAlpha, len = 1, lower = 0)
-  checkmate::assertNumeric(socBeta, len = 1, lower = 0)
+  checkmate::assertNumeric(mnSocExp, len = 1, lower = 0)
   checkmate::assertInteger(as.integer(n.removed), lower = 0, upper = N-1, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(baseline.in), lower = 2, any.missing = FALSE, len = 1)
   checkmate::assertInteger(as.integer(baseline.out), lower = 0, any.missing = FALSE, len = 1)
@@ -44,16 +42,16 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   ## By trial and error (using this app https://homepage.divms.uiowa.edu/~mbognar/applets/beta.html), I found alpha (14) and beta (8) parameters for a beta distribution that yields a mean of approximately 0.63 and seems to have a reasonable spread (this is based on nothing besides eyeballing it, to be totally honest).
   ## Why do I want the mean to be 0.63? Because initially I had the network density at 0.4, and the square root of 0.4 is around 0.63. If I'm right about this, drawing sociabilities from a distribution centered around 0.63 and then randomly interacting those individuals should yield an overall network density of around 0.4. Let's test it out.
   soc <- data.frame(indiv = 1:N,
-                    sociability = rbeta(N, shape1 = socAlpha, shape2 = socBeta))
+                    sociability = rexp(N, rate = 1/mnSocExp))
   probMatrix <- soc$sociability %*% t(soc$sociability)
   
   ## Empty list to hold networks
   network.history <- vector(mode = "list", length = baseline.in + 1)
   
   ## Create random networks for the first two time steps 
-  network.history[[1]] <- sna::symmetrize(matrix(rbinom(N*N, 1, probMatrix), N, N), 
+  network.history[[1]] <- sna::symmetrize(matrix(suppressWarnings(rbinom(N*N, 1, probMatrix)), N, N), 
                                           rule = "upper")
-  network.history[[2]] <- sna::symmetrize(matrix(rbinom(N*N, 1, probMatrix), N, N), 
+  network.history[[2]] <- sna::symmetrize(matrix(suppressWarnings(rbinom(N*N, 1, probMatrix)), N, N), 
                                           rule = "upper")
   
   ## Starting at element 3, update the probMatrix with the `mod` values. Then create new adjacency matrices.
@@ -124,7 +122,7 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   newProbMatrix[h10] <- newProbMatrix[h10]*(1+mod10)
   
   ## CREATE ADJ MATRIX FOR REWIRED NETWORK -----------------------------------
-  rewiredAdj <- suppressWarnings(matrix(rbinom(N*N, 1, newProbMatrix), N, N))
+  rewiredAdj <- suppressWarnings(matrix(suppressWarnings(rbinom(N*N, 1, newProbMatrix)), N, N))
   
   ## SYMMETRIZE REWIRED NETWORK ----------------------------------------------
   rewiredAdj <- as.matrix(sna::symmetrize(rewiredAdj, rule = "upper"))
@@ -172,5 +170,6 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
   return(list("network.history.nas" = network.history,
               "network.history.nodesRemoved" = network.history.nodesRemoved,
               "graphs" = graphs,
-              "whichRemoved" = del))
+              "whichRemoved" = del,
+              "socs" = soc$sociability))
 }

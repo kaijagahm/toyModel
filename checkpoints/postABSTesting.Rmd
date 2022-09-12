@@ -27,11 +27,10 @@ source(here("modelFunction_rewiring.R"))
 ```{r code_folding = F}
 # Define parameters
 N = 50
-socAlpha = 2
-socBeta = 4
+mnSocExp = 0.3
 n.removed = 10
-burn.in = 10
-recovery = 5
+baseline.in = 10
+baseline.out = 5
 mod00 = -0.4
 mod01 = 0.2
 mod10 = -0.2
@@ -41,11 +40,10 @@ coefBereavement = 1
 
 ```{r}
 modelGraphs <- runModel(N = N, # Nodes in the network
-                        socAlpha = socAlpha,
-                        socBeta = socBeta,
+                        mnSocExp = mnSocExp,
                         n.removed = n.removed,
-                        burn.in = burn.in,
-                        recovery = recovery,
+                        baseline.in = baseline.in,
+                        baseline.out = baseline.out,
                         mod00 = mod00, 
                         mod11 = mod11, 
                         mod10 = mod10, 
@@ -70,7 +68,7 @@ df %>%
   ggplot(aes(x = timestep, y = degree, col = initDegree, group = id))+
   geom_line()+
   scale_color_viridis_c()
-# yes, we definitely see some individual differences in degree over time. The strength of this effect depends on socAlpha and socBeta.
+# yes, we definitely see some individual differences in degree over time. The strength of this effect depends on mnSocExp.
 ```
 
 ## 3. Trends for many model runs
@@ -83,12 +81,11 @@ nRuns <- 500
 modelRuns <- vector(mode = "list", length = nRuns)
 for(i in 1:nRuns){
   modelRuns[[i]] <- runModel(N = 50, # Nodes in the network
-                             socAlpha = socAlpha,
-                             socBeta = socBeta,
+                             mnSocExp = mnSocExp,
                              n.removed = n.removed,
                              id = NULL,
-                             burn.in = burn.in,
-                             recovery = recovery,
+                             baseline.in = baseline.in,
+                             baseline.out = baseline.out,
                              mod00 = mod00, 
                              mod01 = mod01, 
                              mod10 = mod10,
@@ -151,7 +148,7 @@ densDF %>%
   geom_line(aes(group = run), col = densColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
   
-  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = baseline.in+1), size = 0.7, lty = 2)+
   ylab("Density")+
   xlab("Time slice")
 ```
@@ -166,7 +163,7 @@ mdDF %>%
   ggplot(aes(x = slice, y = meanDistance))+
   geom_line(aes(group = run), col = mdColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = baseline.in+1), size = 0.7, lty = 2)+
   ylab("Mean Distance")+
   xlab("Time slice")
 ```
@@ -181,7 +178,7 @@ moduDF %>%
   ggplot(aes(x = slice, y = modularity))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = baseline.in+1), size = 0.7, lty = 2)+
   ylab("Modularity")+
   xlab("Time slice")
 
@@ -193,7 +190,7 @@ moduDF %>%
   ggplot(aes(x = slice, y = nClusters/nIndivs))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = baseline.in+1), size = 0.7, lty = 2)+
   ylab("Clusters per individual")+
   xlab("Time slice")
 
@@ -205,7 +202,7 @@ moduDF %>%
   ggplot(aes(x = slice, y = nIndivs/nClusters))+
   geom_line(aes(group = run), col = moduColor, size = 0.2, alpha = 0.2)+
   geom_line(aes(x = slice, y = avg), col = "black", size = 0.9)+
-  geom_vline(aes(xintercept = burn.in+1), size = 0.7, lty = 2)+
+  geom_vline(aes(xintercept = baseline.in+1), size = 0.7, lty = 2)+
   ylab("Individuals per cluster")+
   xlab("Time slice")
 ```
