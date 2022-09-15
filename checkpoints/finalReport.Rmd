@@ -21,6 +21,103 @@ library(igraph)
 library(tnet) # for the closeness function described here: https://toreopsahl.com/2010/03/20/closeness-centrality-in-networks-with-disconnected-components/
 source(here("modelFunction_rewiring.R"))
 
+densColor <- "#151FC6"
+moduColor <- "#C61578"
+mdColor <- "#C6BC15"
+```
+
+# Introduction
+
+## Vultures and mortality by poisoning
+
+Eurasian griffon vultures (*Gyps fulvus,* hereafter "griffons" or "griffon vultures") are obligate scavengers [@ruxton2004] and social foragers [@harel2017]. This means that they feed exclusively on carcasses. They locate these food sources largely by following other individuals---using social information to locate food is essential in an environment where food sources are both ephemeral and spatio-temporally unpredictable.
+
+However, vultures' tendency to aggregate at carcasses makes them particularly vulnerable to poisoning at carcasses laced with pesticides, which are often illegally deposited by farmers to target predators that threaten their livestock [@bbcnews2019]. Another source of poisoning is non-steroidal anti-inflammatory drugs (NSAIDs), which are often used for veterinary treatment of livestock and can be toxic to vultures [@anglister2022]. Poisoning is a major threat to griffon vulture populations. It is the leading cause of death in the griffon population in Israel, where the species is locally endangered [@anglister2022]. It also threatens vulture species across the world [@ives2022a]. Crucially, because vultures gather to feed at carcasses, poisoned carcasses can kill many individuals within a very short time period. For example, on 2021-10-24 in the southern part of Israel, 13 vultures died in a single poisoning event [@anglister2022]. In 2019, eight vultures were poisoned in one day in the Golan Heights, in northern Israel, with two more transported to a wildlife hospital for treatment after they were found alive at the carcass site [@bbcnews2019b].
+
+![A Eurasian Griffon Vulture (*Gyps fulvus*) and an Egyptian Vulture (*Neophron percnopterus,* at left) feed at a carcass provided at a feeding site in Israel. Photo by Noa Pinter-Wollman, 2022.](images/feedingStationCarcass_pinterWollman.JPG){alt="A Eurasian Griffon Vulture (Gyps fulvus) and an Egyptian Vulture (Neophron percnopterus) feed at a carcass provided at a feeding site in Israel. Photo by Noa Pinter-Wollman."}
+
+## Effects of mortality on social structure
+
+Mortality events such as those caused by poisoning affect not just the raw number of individuals in a population but also the population's social structure---the frequency and patterns of relationships between particular individuals. Social structure can have important consequences for information transfer and resource acquisition [@gil2018], as well as the spread of disease [@griffin2012][@silk2019], and population growth [@allee1932]. The population of griffon vultures in Israel is small; the birds rely heavily on social information to find food; and the population is threatened by infection with mycoplasma, which may spread through shared feeding events [@anglister2022]. Therefore, the impact of multiple mortality on griffon vulture social networks is of both theoretical and practical interest.
+
+One way of understanding population social structure is by modeling it as a social network. Node removal has been a topic of interest in the social network literature for some time, with a particular focus on understanding how the characteristics of the removed node mediate the effect of its removal on the network. In behavioral ecology, this question has been explored both through simulations and experimental removals [@shizuka2020a]. Theoretical literature has also explored how networks react to sequential removals of multiple nodes; for instance, while scale-free networks are surprisingly robust to individual node failures, they are vulnerable to targeted sequential removals of the most connected nodes [@albert2000]. Literature on sequential removals in ecology has largely focused on the sequential extinction of species or habitats in ecological networks (e.g. [@biella]); I could not find an example of sequential removal in social interaction networks. Similarly, while some theory exists on the response of networks to the removal of multiple nodes simultaneously [@schwarze], the effect of simultaneous multiple node loss on animal social networks remains unknown.
+
+### Global network measures
+
+Here, I use a modeling approach to simulate a vulture population in which several individuals are lost simultaneously. I examine the effect of the removals, and the subsequent rewiring of the network, on several global measures of social network structure.
+
+Network **density** describes the number of edges present in the network, divided by the total number of possible edges. In a co-feeding network of vultures, density could be directly related to the transmission of mycoplasma during feeding events. Since vultures detect carcasses through social information transmission in flight, the density of a co-flight network also has the potential to affect how quickly and/or reliably vultures can find food.
+
+**Mean distance,** or average path length, describes the average minimum distance between each pair of nodes in the network, following existing edges. A larger mean distance between nodes indicates that the network is more spread out, with individuals interacting with fewer other individuals on average.
+
+Finally, **modularity** measures whether a given division of the network into clusters is good, i.e. the extent to which there are more within-cluster edges than between-cluster edges [@clauset2004]. Networks with intermediate levels of modularity transmit social information most efficiently [@romano2018], and <!--# another citation here about why modularity is relevant/important -->
+
+### Characterizing the lost nodes
+
+The effect of multiple-node loss on these network measures should depend not only on **how many** nodes are lost, but also on **the characteristics** of those nodes, relative both to the network at large and to each other. Understanding how the characteristics of the removed nodes affects the consequences of the removal will help us predict the consequences of real-world removals. We might measure the characteristics of the removed nodes either individually or in aggregate, and each of these levels might be important to understanding the effect of the removal on the network structure.
+
+First, we might ask how **central** the removed nodes were. We know that removing a single more central individual has a greater effect on the network than removing a node selected at random [@albert2000]. By extension, I predict that when the multiple removed nodes are more central on average, there will be a greater effect on network structure as a result of their removal. This type of measure will be important if, for example, more central individuals tend to arrive at a poisoned carcass first (e.g. because they have more access to social information about food resources) and/or get better access to the carcass (and therefore a higher dose of the poison) than less central individuals.
+
+Second, we can ask to what extent the removed nodes are **clustered** on the network, as opposed to evenly spread across it. This is a relevant question if, for example, social transmission of information about the carcass location results in poisoned individuals being more closely clustered on the network than would be expected by chance.
+
+**Question 1:** How is the effect of multiple-node loss on global network measures mediated by the centrality and clusteredness of the removed nodes?
+
+**Predictions:**
+
+| Removed node characteristic | (delta) network density                                                                                                               | (delta) mean distance                                                                            | (delta) modularity                                                                            |
+|-----------------|---------------------|-----------------|-----------------|
+| Mean centrality             | Negative relationship: more central removed individuals --\> greater decline in density.                                              | Positive relationship: more central removed individuals --\> greater increase in mean distance.  | Positive relationship: more central removed individuals --\> greater increase in modularity.  |
+| Clustering                  | No effect: the change in network density should be independent of the extent to which the removed individuals form their own cluster. | Negative relationship: more clustering of lost individuals -\> greater decline in mean distance. | Negative relationship: more clustering of lost individuals -\> greater decline in modularity. |
+
+### Recovery and rewiring of the network following losses
+
+Network "rewiring" is the process of individuals establishing new social connections (or, in a weighted network, strengthening existing ones) following the loss of some individuals from the population. New connections may form at random, or they may follow a pattern based on how individuals behave in response to the loss(es). For example, in a songbird social network, rewiring after flockmate loss follows a pattern of "second-degree rewiring," whereby individuals with ties to the lost individual are more likely to form new connections with each other than with other individuals [@farine2021].
+
+Since I am interested in determining how the simultaneous loss of multiple individuals affects the structure of the griffon vulture social network, I wanted to be able to test hypotheses about how rewiring proceeds in this system. In other words, how does having been connected to removed individuals affect an individual's tendency to make new connections or retain existing ones? Does second-degree rewiring operate in the griffon vulture system, or do we observe a different pattern?
+
+In behavioral ecology, [@shizuka2020] has distinguished between different types of mortality or node removals, arguing that the response of the social network should be different in cases where mortality can be reasonably anticipated by individuals in the population (such as mortality due to sickness or old age) than in cases of unanticipated mortality (e.g. predation or anthropogenic causes like shooting or poisoning). When vultures die from poisoning, mortality is sudden and unanticipated; especially given the magnitude of the losses in relation to the population size, it is of particular importance to understand how other individuals in the population will react.
+
+**Question 2:** How do the effects of multiple-node loss differ under different assumptions about how individuals are affected by the deaths of their connections (i.e. rewiring rules)?
+
+# Methods
+
+## Study System: A Vulture Co-Feeding Network
+
+The system that inspired this model is a GPS-tagged population of griffon vultures (*Gyps fulvus*) in Israel. The species is locally critically endangered [@efrat2020], and its conservation is managed by the Israel Nature and Parks Authority (INPA), which runs supplemental feeding stations throughout the country [@spiegel2013]. Israel's griffon vultures live mainly in the Negev and Judean deserts in the south. There is a small population in northeastern Israel and a declining population in the northwest.
+
+As part of a collaborative NSF-BSF project between Orr Spiegel and Noa Pinter-Wollman, nearly 100 vultures have been fitted with GPS transmitters over the past two years. These tags provide location information at 10-minute intervals, with data automatically transmitted to Movebank. As of 2022, approximately 70% of the griffon population in Israel is tagged. This high coverage of the population means that the majority of a tagged individual's social interactions are with other tagged individuals, allowing us to study social interactions with greater certainty than is possible in many studies of free-ranging animals.
+
+Despite the extent of this dataset, it is not sufficient to directly address questions about the impact of multiple mortality on the vulture social network. While poisoning events pose a severe threat to the vulture population, mass poisonings have occurred only a handful of times during the current study, and in several instances they occurred in regions where relatively smaller proportions of the population were tagged. Therefore, I sought to create a model that I could perturb to test hypotheses about the effect of multiple mortality on the griffon vulture social network.
+
+## Model structure and testing
+
+I set out to create an individual-based model that would plausibly capture the day-to-day dynamics of the griffon vulture social network. In the past, the NSF-BSF vulture team has created interaction networks specific to different social situations, defining the network edges in different, biologically meaningful ways for each situation [@sharma2022]. For example, an interaction in the "co-feeding" network is defined as two individuals coming within 50 meters of each other during at least two consecutive 10-minute intervals. My model is intended to represent a co-feeding network in an abstract way.
+
+### Model structure
+
+#### Baseline
+
+The initial network consists of `N` nodes, each of which is assigned an inherent interaction probability, which I will refer to as `sociability`. `sociability` values are drawn from an exponential distribution with mean `mnSocExp`; the default is an exponential distribution with mean 0.3. Multiplying all combinations of individual `sociability` values generates an undirected probability matrix, which is then used to perform a series of weighted coin flips to select whether an edge does or does not exist between the two individuals in question. Two adjacency matrices are generated in this way for the first two time steps of the model.
+
+Subsequent time steps take into account the presence or absence of edges in the previous two time steps. For each edge, the baseline edge probability (`sociabilityA` \* `sociabilityB`) is modified by one of four modifier coefficients (`mod00`, `mod01`, `mod10`, and `mod11`) according to its history. For example, an edge with history "00" (i.e. the edge did not exist in either of the previous two time steps) will have the new probability p~A,B~ = `sociabilityA` \* `sociabilityB` \*(1+`mod00`). (By analogy, `mod01` is used for edges that existed in the most recent time step but not in the one before, `mod10` for edges that did not exist in the most recent time step but *did* exist in the one before, and `mod11` for edges that have existed in both previous time steps.) By default, the modifier values are set as follows:
+
+`mod00` = -0.4 (i.e. an edge with history "00" is 40% *less* likely to exist in the next time step than would be predicted by the baseline sociability values of its two nodes. The individuals are unfamiliar with each other and disinclined to make connections with strangers).
+
+`mod10` = 0.1 (an edge with history "10" is 10% more likely to exist in the next time step: the individuals have some familiarity with each other and therefore might be more inclined to interact).
+
+`mod01` = 0.2 (an edge with history "01" is 20% more likely to exist in the next time step: the individuals have just previously interacted and might be inclined to maintain the connection).
+
+`mod11` = 0.3 (i.e. an edge with history "11" is 30% *more* likely to exist in the next time step than would be predicted by the baseline sociability values of its two nodes. The two individuals are familiar with each other and are likely to continue to interact).
+
+These values are intended to introduce social preference into the model. Previous associations are more likely to persist into the next time step, but once an edge has been lost, it is likelier to stay lost.
+
+In some cases, these adjustments will produce probability values greater than 1 or less than 0. After computing the probabilities, they are truncated, with any values \> 1 set to 1 and any values \< 0 set to 0.
+
+This process is repeated in each time step for the length of the `baseline.in` period, producing steady-state dynamics, with individuals' degrees being relatively stable over time. The network in the time slice following the `baseline.in`th network is the one from which nodes will be removed (see [Model structure]).
+
+Here is an example series of graphs demonstrating the baseline network dynamics over five time steps. Nodes are colored by their sociability values, with lighter colors indicating higher inherent sociability.
+
+```{r echo = FALSE, out.width = "20%"}
 # Define parameters
 N = 50
 mnSocExp = 0.3
@@ -33,95 +130,6 @@ mod10 = -0.2
 mod11 = 0.4
 coefBereavement = 1
 
-# One model run
-mod1 <- runModel(N = N, n.removed = n.removed, mnSocExp = mnSocExp, baseline.in = baseline.in, baseline.out = baseline.out, mod00 = mod00, mod10 = mod10, mod01 = mod01, mod11 = mod11, id = NULL, coefBereavement = coefBereavement)
-socs <- mod1$socs
-graphs <- mod1$graphs
-```
-
-# Introduction
-
-## Vultures and mortality by poisoning
-
-Eurasian griffon vultures (*Gyps fulvus,* hereafter "griffons" or "griffon vultures") are obligate scavengers [@ruxton2004] and social foragers [@harel2017]. This means that they feed exclusively on carcasses. They locate these food sources largely by following other individuals---using social information to locate food is essential in an environment where food sources are both ephemeral and spatio-temporally unpredictable.
-
-However, vultures' tendency to aggregate at carcasses makes them particularly vulnerable to poisoning at carcasses laced with pesticides, which are often illegally deposited by farmers to target predators that threaten their livestock [@bbcnews2019]. Another source of poisoning is non-steroidal anti-inflammatory drugs (NSAIDs), which are often used for veterinary treatment of livestock and can be toxic to vultures [@anglister2022]. Poisoning is a major threat to griffon vulture populations. It is the leading cause of death in the griffon population in Israel, where the species is locally endangered [@anglister2022]. It also threatens vulture species across the world [@ives2022a]. Crucially, because vultures gather to feed at carcasses, poisoned carcasses can kill many individuals within a very short time period. For example, on 2021-10-24 in the southern part of Israel, 13 vultures died in a single poisoning event [@anglister2022a]. In 2019, eight vultures were poisoned in one day in the Golan Heights, in northern Israel, with two more transported to a wildlife hospital for treatment after they were found alive at the carcass site [@bbcnews2019a].
-
-![A Eurasian Griffon Vulture (*Gyps fulvus*) and an Egyptian Vulture (*Neophron percnopterus,* at left) feed at a carcass provided at a feeding site in Israel. Photo by Noa Pinter-Wollman, 2022.](images/feedingStationCarcass_pinterWollman.JPG){alt="A Eurasian Griffon Vulture (Gyps fulvus) and an Egyptian Vulture (Neophron percnopterus) feed at a carcass provided at a feeding site in Israel. Photo by Noa Pinter-Wollman."}
-
-## Effects of mortality on social structure
-
-Mortality events such as those caused by poisoning affect not just the raw number of individuals in a population but also the population's social structure---the frequency and patterns of relationships between particular individuals. Social structure affects <!--# thing, ref --> and <!--# thing, ref -->, which are both of conservation concern. Therefore, it is important to understand how mortality might impact these processes.
-
-One way of understanding population social structure is by modeling it as a social network. Node removal has been a topic of interest in the social network literature for some time, with a particular focus on understanding how the characteristics of the removed node mediate the effect of its removal on the network. This literature has also explored how networks react to sequential removals of multiple nodes; for instance, <!--# REF --> finds that <!--# result having to do with network collapse after a certain point -->. However, the existing literature has not explored the results of the simultaneous loss of several individuals (as opposed to the loss of one individual or sequential loss of several).
-
-### Global network measures
-
-Here, I use a modeling approach to simulate a vulture population in which several individuals are lost simultaneously. I examine the effect of the removals, and the subsequent rewiring of the network, on several global measures of social network structure.
-
-Network **density** describes the number of edges present in the network, divided by the total number of possible edges. <!--# explanation of why density matters -->.
-
-**Mean distance** describes the average minimum distance between each pair of nodes in the network, following existing edges. <!--# explanation of why mean distance matters -->.
-
-Finally, **modularity** measures whether a given division of the network into clusters is good, i.e. the extent to which there are more within-cluster edges than between-cluster edges (see [Methods] for more details on clustering algorithms <!--# TODO add more details -->) [@clauset2004]. Networks with intermediate levels of modularity transmit social information most efficiently [@romano2018], and <!--# another citation here about why modularity is relevant/important -->
-
-### Characterizing the lost nodes
-
-The effect of multiple-node loss on these network measures should depend not only on **how many** nodes are lost, but also on **the characteristics** of those nodes, relative both to the network at large and to each other. Understanding how the characteristics of the removed nodes affects the consequences of the removal will help us predict the consequences of real-world removals. We might measure the characteristics of the removed nodes either individually or in aggregate, and each of these levels might be important to understanding the effect of the removal on the network structure.
-
-First, we might ask how central the removed nodes were. We know that removing a single more central individual has a greater effect on the network <!--# REF -->. By extension, I predict that when the multiple removed nodes are more central on average, there will be a greater effect on network structure as a result of their removal. This type of measure will be important if, for example, more central individuals tend to arrive at a poisoned carcass first (e.g. because they have more access to social information about food resources) and/or get better access to the carcass (and therefore a higher dose of the poison) than less central individuals.
-
-Second, we can ask to what extent the removed nodes are clustered on the network, as opposed to evenly spread across it. This is a relevant question if, for example, social transmission of information about the carcass location results in poisoned individuals being more closely clustered on the network than would be expected by chance.
-
-**Question 1:** How is the effect of multiple-node loss on global network measures mediated by the centrality and clusteredness of the removed nodes?
-
-### Recovery and rewiring of the network following losses
-
-Rewiring is the process of individuals establishing new social connections (or, in a weighted network, strengthening existing ones) following node loss. [@farine2021] describes a pattern of "second-degree rewiring" in a network of songbirds following flockmate loss, whereby individuals with ties to the lost individual are more likely to form new connections with each other than with other individuals.
-
-Since I am interested in determining how the simultaneous loss of multiple individuals affects the structure of the griffon vulture social network, I wanted to be able to test hypotheses about how rewiring proceeds in this system. In other words, how does having been connected to removed individuals affect an individual's tendency to make new connections or retain existing ones? Does second-degree rewiring operate in the griffon vulture system, or do we observe a different pattern?
-
-<!--# Probably another introductory paragraph here -->
-
-In behavioral ecology, [@shizuka2020] has distinguished between different types of mortality or node removals, arguing that the response of the social network should be different in cases where mortality can be reasonably anticipated by individuals in the population (such as mortality due to sickness or old age) than in cases of unanticipated mortality (e.g. predation or anthropogenic causes like shooting or poisoning).
-
-**Question 2:** How do the effects of multiple-node loss differ under different assumptions about how individuals are affected by the deaths of their connections (i.e. rewiring rules)?
-
-# Methods
-
-## Study System: A Vulture Co-Feeding Network
-
-The system that inspired this model is a GPS-tagged population of griffon vultures in Israel. The species is locally critically endangered [@efrat2020a] and is managed by the Israel Nature and Parks Authority (INPA), which runs supplemental feeding stations throughout the country [@spiegel2013]. Israel's griffon vultures live mainly in the Negev and Judean deserts in the south. There is a small population in northeastern Israel and a declining population in the northwest.
-
-As part of a collaborative NSF-BSF project between Orr Spiegel and Noa Pinter-Wollman, nearly 100 vultures have been fitted with GPS transmitters over the past two years. These tags provide location information at 10-minute intervals, with data automatically transmitted to Movebank. As of 2022, approximately 70% of the griffon population in Israel is tagged. This high coverage of the population means that the majority of a tagged individual's social interactions are with other tagged individuals, allowing us to study social interactions with greater certainty than is possible in many studies of free-ranging animals.
-
-Despite the extent of this dataset, it is not sufficient to directly address questions about the impact of multiple mortality on the vulture social network. While poisoning events pose a severe threat to the vulture population, mass poisonings have occurred only a handful of times during the current study, and in several instances they occurred in regions where relatively smaller proportions of the population were tagged. Therefore, I wanted to create a model that would mimic the baseline dynamics of the real vulture social network, and which I could perturb to test hypotheses about the effect of multiple mortality on the griffon vulture social network.
-
-## Model structure and parameterization
-
-I set out to create an individual-based model that would plausibly capture the day-to-day dynamics of the griffon vulture social network. In the past, the NSF-BSF vulture team has created interaction networks specific to different social situations, defining the network edges in different, biologically meaningful ways for each situation [@sharma2022]. For example, an interaction in the "co-feeding" network is defined as two individuals coming within 50 meters of each other during at least two consecutive 10-minute intervals. My model is intended to represent a co-feeding network in an abstract way.
-
-### Baseline
-
-The initial network consists of `N` nodes, each of which is assigned an inherent interaction probability, which I will refer to as `sociability`. `sociability` values are drawn from a beta distribution (so that its domain is restricted to [0,1]) with parameters `socAlpha` and `socBeta`. <!--# defaults, and parameterizing this--maybe based on the degree distribution that it generates? --> Multiplying all combinations of individual `sociability` values generates an undirected probability matrix, which is then used to perform a series of weighted coin flips to select whether an edge does or does not exist between the two individuals in question. Two adjacency matrices are generated in this way for the first two time steps of the model.
-
-Subsequent time steps take into account the presence or absence of edges in the previous two time steps. For each edge, the baseline edge probability (`sociabilityA` \* `sociabilityB`) is modified by one of four modifier coefficients (`mod00`, `mod01`, `mod10`, and `mod11`) according to its history. For example, an edge with history "00" (i.e. the edge did not exist in either of the previous two time steps) will have the new probability p~A,B~ = `sociabilityA` \* `sociabilityB` \*(1+`mod00`). (By analogy, `mod01` is used for edges that existed in the most recent time step but not in the one before, `mod10` for edges that did not exist in the most recent time step but *did* exist in the one before, and `mod11` for edges that have existed in both previous time steps.) By default, the modifier values are set as follows:
-
-`mod00` = -0.2 (i.e. an edge with history "00" is 20% *less* likely to exist in the next time step than would be predicted by the baseline sociability values of its two nodes)
-
-`mod10` = -0.1
-
-`mod01` = 0.1
-
-`mod11` = 0.2 (i.e. an edge with history "11" is 20% *more* likely to exist in the next time step than would be predicted by the baseline sociability values of its two nodes)
-
-These values are intended to introduce social preference into the model. Previous associations are more likely to persist into the next time step, but once an edge has been lost, it is likelier to stay lost. <!--# consider heavily penalizing mod00 and making mod10 slightly positive... -->
-
-In some cases, these adjustments will produce probability values greater than 1 or less than 0. After computing the probabilities, they are truncated, with any values \> 1 set to 1 and any values \< 0 set to 0.
-
-This process is repeated in each time step for the length of the `baseline.in` period, producing steady-state dynamics, with individuals' degrees being relatively stable over time. The network in the time slice following the `baseline.in`th network is the one from which nodes will be removed (see [Removal]).
-
-```{r echo = FALSE, out.width = "20%"}
 # an example of some baseline dynamics
 ex <- runModel(N = 30, n.removed = 3, mnSocExp = mnSocExp, baseline.in = baseline.in, baseline.out = baseline.out, mod00 = mod00, mod10 = mod10, mod01 = mod01, mod11 = mod11, id = NULL, coefBereavement = coefBereavement)
 soc <- ex$socs
@@ -137,22 +145,25 @@ for(i in 1:length(example)){
     theme_void()+
     scale_color_viridis_c()+
     theme(legend.position = "none")+
+    ggtitle(paste0(i))+
     NULL
   print(g)
 }
 ```
 
-### Removal
+### Model structure
+
+#### Removal
 
 In the removal phase, `n.removed` nodes are removed from the network, along with all of their edges. This simulates a multiple mortality event (e.g. a poisoning). By default, the removed nodes are chosen randomly, though the model contains an `id` parameter that can be used to optionally specify the identities of `n.removed` particular nodes. Thus, the network at time step `baseline.in + 1` contains `N - n.removed` individuals, as will the networks at all subsequent time steps.
 
-### Rewiring
+### Model structure
+
+#### Rewiring
 
 For each individual remaining in the network after the removal time step, a `bereavement` proportion is calculated as the (number of its associates in the time step immediately before removal that were subsequently removed)/(degree in the time step immediately before removal). In other words, what proportion of the individuals it was connected to died in the mortality event? This is a coarse measure of how directly affected the focal individual is by the multiple mortality event.
 
 For example, if individual A had interacted with B, D, and E, and individuals B and D subsequently died in the mortality event, then individual A would have a value of 2/3 = 0.66 for its `bereavement`. Meanwhile, individual E, which had interacted only with A and C, would not be affected at all (`bereavement` = 0).
-
-![](images/File_000.png){width="316"}
 
 The degree to which an individual's `bereavement` proportion affects its interaction probability is controlled by `coefBereavement`. By default, `coefBereavement` is 1, which means that for every percentage point that `bereavement` increases, an individual's `sociability` increases by that same amount. Using the example shown above, if individual A had a `sociability` value of 0.5 and individual E had a `sociability` value of 0.3, their new sociability values would be as follows:
 
@@ -168,6 +179,643 @@ Finally, the modified probability matrix is adjusted using the `mod` values, acc
 
 Finally, the model is allowed to return to its baseline dynamics for a number of time steps specified as `baseline.out`.
 
+### Measuring the network and the removed nodes
+
+To calculate network-level measures on the modeled networks in each time step, I used functions from the `igraph` package [@csardi2005]. `edge_density` and `mean_distance` were used to calculate density and mean distance. To calculate modularity, I used the `cluster_fast_greedy` algorithm, one of only a few clustering algorithms that would work on networks with disconnected components (My networks frequently had isolated nodes (i.e. nodes not attached to any edges), which is similar to interaction patterns in the real data. ), and then ran `igraph::modularity` on the resulting clustered graph object.
+
+I computed the mean degree of the removed nodes with `igraph::degree()`. I had trouble finding a way to measure the extent to which the removed nodes constituted their own cluster, versus being randomly distributed throughout the overall graph. Here, I recognized the potential to use the `modularity` function again, since it measures the goodness of fit of a proposed cluster assignment to the graph in question. I artificially "clustered" the network nodes, assigning all the to-be-removed nodes to one group and all the other nodes to another group. Then I calculated the modularity of the resulting graph with these two groups as the proposed "clusters."
+
+### Testing predictions
+
+#### Number of nodes and node characteristics
+
+#### Rewiring mechanisms
+
+Run the model again, both times with 50 individuals, remove 10. In the "sociable" case, losing friends makes individuals **more** inclined to interact (`coefBereavement` = 1). In the "unsociable" case, losing friends makes individuals **less** inclined to interact (`coefBereavement` = -2). <!--# move this part to methods. A couple of the other results parts should also be in methods. -->
+
 # Results
 
+## Proportion of nodes removed
+
+To investigate how the number of individuals lost affects the global social network measures, I ran the model with a network of 50 individuals, removing different numbers of individuals, up to 40 (80% of the population). I set the edge history `mod` parameters to their defaults, and I set `coefBereavement` to its default of 1 (meaning that an individual losing a proportion X of its connections makes it X times more likely to interact in the next time step).
+
+First, I examined whether the proportion of nodes removed from the network affects the magnitude of the immediate change in global network (direct effects of removal). The y axis in these graphs, "Change due to removal," is defined as the difference between the global measure values in the time slice immediately after removal (but before rewiring) and in the time slice immediately before removal.
+
+```{r echo = FALSE}
+N = 50
+mnSocExp = 0.3
+n.removed = 10
+baseline.in = 10
+baseline.out = 5
+mod00 = -0.4
+mod01 = 0.2
+mod10 = -0.2
+mod11 = 0.4
+coefBereavement = 1
+
+# To remove
+nRemoved <- c(1, 5, 10, 15, 20, 25, 30, 35, 40)
+propRemoved <- nRemoved/50
+nRuns <- 100
+graphs <- vector(mode = "list", length = length(nRemoved))
+modelRuns <- vector(mode = "list", length = nRuns)
+
+for(i in 1:length(graphs)){
+  graphs[[i]] <- modelRuns
+  for(j in 1:nRuns){
+    graphs[[i]][[j]] <- runModel(N = 50, # Nodes in the network
+                                 mnSocExp = mnSocExp,
+                                 n.removed = nRemoved[i],
+                                 id = NULL,
+                                 baseline.in = baseline.in,
+                                 baseline.out = baseline.out,
+                                 mod00 = mod00, 
+                                 mod01 = mod01, 
+                                 mod10 = mod10,
+                                 mod11 = mod11,
+                                 coefBereavement = coefBereavement)$graphs
+  }
+}
+
+# Define functions for doing computations
+computeDens <- function(modelRuns){
+  densDF <- lapply(modelRuns, function(x){
+    lapply(x, function(y){
+      edge_density(y)
+    }) %>%
+      unlist() %>%
+      as.data.frame() %>%
+      setNames(., "density") %>%
+      mutate(slice = 1:nrow(.))
+  }) %>%
+    data.table::rbindlist(idcol = "run")
+  return(densDF)
+}
+
+computeMD <- function(modelRuns){
+  mdDF <- lapply(modelRuns, function(x){
+    lapply(x, function(y){
+      mean_distance(y)
+    }) %>%
+      unlist() %>%
+      as.data.frame() %>%
+      setNames(., "meanDistance") %>%
+      mutate(slice = 1:nrow(.))
+  }) %>%
+    data.table::rbindlist(idcol = "run")
+  return(mdDF)
+}
+
+computeModu <- function(modelRuns){
+  moduDF <- lapply(modelRuns, function(x){
+    clustered <- lapply(x, cluster_fast_greedy)
+    df <- data.frame(slice = 1:length(clustered),
+                     modularity = unlist(lapply(clustered, modularity)),
+                     nClusters = unlist(lapply(clustered, length)),
+                     nIndivs = unlist(lapply(x, function(x){length(V(x))})))
+    return(df)
+  }) %>%
+    data.table::rbindlist(idcol = "run")
+  return(moduDF)
+}
+
+# Run functions
+dens <- lapply(graphs, computeDens)
+names(dens) <- propRemoved
+md <- lapply(graphs, computeMD)
+names(md) <- propRemoved
+modu <- lapply(graphs, computeModu)
+names(modu) <- propRemoved
+
+# Combine
+densDF <- data.table::rbindlist(dens, idcol = "propRemoved") %>% 
+  as.data.frame()
+moduDF <- data.table::rbindlist(modu, idcol = "propRemoved") %>% 
+  as.data.frame()
+mdDF <- data.table::rbindlist(md, idcol = "propRemoved") %>% 
+  as.data.frame()
+
+# Combine all three
+networkLevel <- left_join(densDF, mdDF, by = c("run", "slice", "propRemoved")) %>%
+  left_join(moduDF, by = c("run", "slice", "propRemoved"))
+
+back1 <- baseline.in
+removed <- baseline.in + 1
+rewired <- baseline.in + 2
+
+# NETWORK-LEVEL MEASURE DELTAS (before and rewiring)
+deltas <- networkLevel %>%
+  filter(slice %in% c(back1, removed, rewired)) %>%
+  group_by(propRemoved, run) %>%
+  summarize("Density1" = density[slice == removed]-density[slice == back1],
+            "Density2" = density[slice == rewired]-density[slice == removed],
+            "Density3" = density[slice == rewired]-density[slice == back1],
+            "Mean Distance1" = meanDistance[slice == removed]-meanDistance[slice == back1],
+            "Mean Distance2" = meanDistance[slice == rewired]-meanDistance[slice == removed],
+            "Mean Distance3" = meanDistance[slice == rewired]-meanDistance[slice == back1],
+            "Modularity1" = modularity[slice == removed]-modularity[slice == back1],
+            "Modularity2" = modularity[slice == rewired]-modularity[slice == removed],
+            "Modularity3" = modularity[slice == rewired]-modularity[slice == back1]) %>%
+  pivot_longer(cols = -c(run, propRemoved), names_to = "yMeasure", values_to = "yMeasureValue") %>%
+  mutate(change = stringr::str_extract(yMeasure, "[0-9]"),
+         yMeasure = stringr::str_remove(yMeasure, "[0-9]")) %>%
+  mutate(change = case_when(change == 1 ~ "removal",
+                            change == 2 ~ "rewiring",
+                            change == 3 ~ "net")) %>%
+  mutate(propRemoved = as.numeric(propRemoved))
+```
+
+```{r echo = FALSE}
+# REMOVAL
+deltas %>%
+  filter(change == "removal") %>%
+  ggplot(aes(x = jitter(propRemoved), y = yMeasureValue, col = yMeasure))+
+  facet_wrap(~yMeasure, scales = "free")+
+  geom_point(alpha = 0.5, shape = 21)+
+  geom_smooth()+
+  scale_color_manual(values = c(densColor, mdColor, moduColor))+
+  theme_minimal()+
+  theme(legend.position = "none")+
+  xlab("Proportion of individuals lost")+
+  ylab("Change due to removal")+
+  ggtitle("Removal")
+```
+
+The proportion of nodes removed has no consistent effect on the density of the network. There is little effect on mean distance until the proportion of nodes removed reaches about 0.4, at which point mean distance declines sharply. At high proportions of individuals lost, mean distance is almost 1 edge less than it was in the network before the removal. Modularity increases slightly when smaller proportions of nodes are removed, up to around 0.5, after which point it declines.
+
+Next, I examined the ultimate, indirect effects of these removals (i.e. the overall effect on the network after rewiring has occurred). I examined two ratios: values after rewiring compared to pre-removal; and values after rewiring compared to post-removal, pre-rewiring. The latter directly measures the amount of "recovery" provided by the rewiring process, while the former measures the net change in the network after allowing for individuals' indirect response to the node removals.
+
+```{r}
+# REWIRING
+deltas %>%
+  filter(change == "rewiring") %>%
+  ggplot(aes(x = jitter(propRemoved), y = yMeasureValue, col = yMeasure))+
+  facet_wrap(~yMeasure, scales = "free")+
+  geom_point(alpha = 0.5, shape = 21)+
+  geom_smooth()+
+  scale_color_manual(values = c(densColor, mdColor, moduColor))+
+  theme_minimal()+
+  theme(legend.position = "none")+
+  xlab("Proportion of individuals lost")+
+  ylab("Change due to rewiring")+
+  ggtitle("Rewiring")
+```
+
+No matter which measure we consider, the proportion of nodes lost does not affect the recovery of the network due to rewiring. The magnitude of the change due to rewiring varies quite a bit, especially at high proportions of nodes lost, but it is not related to the number of lost nodes.
+
+```{r}
+# NET
+deltas %>%
+  filter(change == "net") %>%
+  ggplot(aes(x = jitter(propRemoved), y = yMeasureValue, col = yMeasure))+
+  facet_wrap(~yMeasure, scales = "free")+
+  geom_point(alpha = 0.5, shape = 21)+
+  geom_smooth()+
+  scale_color_manual(values = c(densColor, mdColor, moduColor))+
+  theme_minimal()+
+  theme(legend.position = "none")+
+  xlab("Proportion of individuals lost")+
+  ylab("Net change")+
+  ggtitle("Rewiring")
+```
+
+Since there is no influence of proportion of individuals lost on the change due to rewiring, the relationship of the net effect of the losses after accounting for rewiring to the proportion of nodes lost is very similar to the relationship of the effect of losses before rewiring to the proportion of nodes lost. The same patterns are evident for each measure.
+
+Having built some intuition for how the network responds to the removal of different numbers of nodes, I moved on to examining how the characteristics of the removed nodes affect the network's response to removals.
+
+## Characteristics of nodes removed
+
+To illustrate the impact of the characteristics of the removed nodes on the changes in network structure, I chose a network of 50 individuals in which 20% of the nodes (10 individuals) are removed. This seemed like a high enough proportion that it would have a significant impact, while still being less than a quarter of the network. As I observed above, the network's response began to show sensitivity to the proportion of nodes removed around 40% removal. 20% is much more conservative, and closer to a real number of individuals that might be lost from the population in a single poisoning event.
+
+For each characteristic (mean centrality or clustering/modularity), I will show graphs of 1) the immediate effect of the removals on the network structure, before rewiring, and 2) the net effect of the removals on the network structure, after accounting for rewiring.
+
+```{r include = FALSE}
+deltas_0.2 <- deltas %>% 
+  filter(propRemoved == 0.2) %>%
+  ungroup() %>%
+  select(-propRemoved)
+
+modelRuns <- graphs[[3]] # the 0.2 ones
+
+# INFO ABOUT THE REMOVED NODE(S)
+removedInfo <- lapply(modelRuns, function(x){
+  init <- V(x[[1]])$label
+  final <- V(x[[length(x)]])$label
+  removedNumbers <- which(!(init %in% final))
+  removedNames <- init[!(init %in% final)]
+  removedDegrees <- degree(x[["back1"]])[removedNumbers]
+  removedBetweennesses <- betweenness(x[["back1"]])[removedNumbers]
+  
+  # Calculate "the extent to which the removed nodes constitute their own cluster"
+  membershipVec <- as.vector(V(x[[1]]))
+  membershipVec[removedNumbers] <- 1
+  membershipVec[-removedNumbers] <- 2
+  # created a cluster membership vector, assigning each of the removed nodes to cluster "1" and each of the remaining nodes to cluster "2"
+  
+  mod <- modularity(x[["back1"]], membership = membershipVec)
+  
+  # Make edge list for calculating closenesses
+  el <- get.edgelist(x[["back1"]], names = TRUE) %>%
+    cbind(., 1) %>%
+    as_tibble() %>%
+    complete(V1 = 1:max(V(x[["back1"]])), V2 = 1:max(V(x[["back1"]])), fill = list(V3 = 0))
+  
+  ## calculate closenesses
+  closenesses <- as.data.frame(suppressWarnings(closeness_w(el, directed = FALSE, gconly = FALSE)))
+  removedClosenesses <- closenesses %>%
+    filter(node %in% removedNumbers)
+  
+  # Pairwise distance matrix for only the about-to-be-removed nodes
+  removedDistances <- distances(x[["back1"]])[removedNumbers, removedNumbers]
+  removedDistances[removedDistances == 0|is.infinite(removedDistances)] <- NA
+  removedDistances[lower.tri(removedDistances)] <- NA # consider only one triangle, since this is undirected
+  removedMeanDistance <- mean(removedDistances, na.rm = T)
+  
+  removedGraph <- subgraph(x[[back1]], vids = removedNumbers)
+  df <- data.frame(name = removedNames, 
+                   number = removedNumbers, 
+                   degree = removedDegrees,
+                   fullGraphDens = edge_density(x[["back1"]]),
+                   btwn = removedBetweennesses,
+                   dens = edge_density(removedGraph),
+                   meanDist = removedMeanDistance,
+                   mod = mod)
+  df <- df %>%
+    left_join(removedClosenesses, by = c("number" = "node"))
+  
+  return(df)
+}) %>%
+  data.table::rbindlist(idcol = "run") %>%
+  as.data.frame()
+
+# SUMMARIZE CHARACTERISTICS OF REMOVED NODE(S)
+removedInfoSummary <- removedInfo %>%
+  group_by(run) %>%
+  summarize(meanDeg = mean(degree, na.rm = T),
+            meanBtwn = mean(btwn, na.rm = T),
+            dens = dens[1],
+            mod = mod[1],
+            fullGraphDens = fullGraphDens[1],
+            meanDist = meanDist[1],
+            meanCloseness = mean(closeness, na.rm = T),
+            meanNormalizedCloseness = mean(n.closeness, na.rm = T))
+
+# COMBINE INDIVIDUAL AND NETWORK MEASURES
+full <- removedInfoSummary %>%
+  left_join(deltas_0.2, by = "run") %>%
+  mutate(label = case_when(yMeasure == "modu" ~ "\u0394 Modularity",
+                           yMeasure == "md" ~ "\u0394 Mean Distance",
+                           yMeasure == "dens" ~ "\u0394 Edge Density",
+                           TRUE ~ NA_character_))
+```
+
+### Centrality
+
+```{r echo = FALSE, message = FALSE}
+# Set some common plot elements
+plotElements = list(geom_point(shape = 1, aes(col = yMeasure)),
+                    geom_smooth(method = "lm", aes(col = yMeasure)),
+                    scale_color_manual(values = c(densColor, mdColor, moduColor)),
+                    facet_wrap(~yMeasure, scales = "free", strip.position = "left"),
+                    theme_minimal(),
+                    theme(strip.placement = "outside",
+                          legend.position = "none",
+                          axis.title.x = element_text(size = 14),
+                          strip.text.y = element_text(size = 14)),
+                    theme(plot.title = element_text(size=22)),
+                    xlab("Centrality of removed nodes (mean degree)"),
+                    ylab(""))
+
+# REMOVAL (REMOVED - BACK1)
+sociableRemovedDeg <- full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "removal") %>%
+  ggplot(aes(x = meanDeg, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Removal")
+sociableRemovedDeg
+
+# xxx not showing this one
+# REIWRING (REWIRED - REMOVED)
+sociableRewiringDeg <- full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "rewiring") %>%
+  ggplot(aes(x = meanDeg, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Rewiring")
+# sociableRewiringDeg
+ggsave(sociableRewiringDeg, filename = "sociableRewiringDeg.png", width = 7, height = 4)
+
+# NET (REWIRED - BACK1)
+sociableNetDeg <- full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "net") %>%
+  ggplot(aes(x = meanDeg, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Net")
+sociableNetDeg
+ggsave(sociableNetDeg, filename = "sociableNetDeg.png", width = 7, height = 4)
+```
+
+Consistent with my predictions, there is a negative relationship between the mean degree of the removed nodes and the resulting change to the network. In general, when the removed nodes are on average more central (higher mean degree), network density decreases more than when the nodes are less central. Likewise consistent with my predictions, both mean distance and modularity show greater increases when the nodes removed are more central on average.
+
+### Clustering
+
+```{r echo = FALSE}
+# Set some common plot elements
+plotElements = list(geom_point(shape = 1, aes(col = yMeasure)),
+                    geom_smooth(method = "lm", aes(col = yMeasure)),
+                    scale_color_manual(values = c(densColor, mdColor, moduColor)),
+                    facet_wrap(~yMeasure, scales = "free", strip.position = "left"),
+                    theme_minimal(),
+                    theme(strip.placement = "outside",
+                          legend.position = "none",
+                          axis.title.x = element_text(size = 14),
+                          strip.text.y = element_text(size = 14)),
+                    theme(plot.title = element_text(size=22)),
+                    xlab("Modularity of removed nodes"),
+                    ylab(""))
+
+# REMOVAL (REMOVED - BACK1)
+sociableRemovedMod <- full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "removal") %>%
+  ggplot(aes(x = mod, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Removal")
+sociableRemovedMod
+
+# xxx not showing this one
+# REIWRING (REWIRED - REMOVED)
+sociableRewiringMod <- full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "rewiring") %>%
+  ggplot(aes(x = mod, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Rewiring")
+#sociableRewiringMod
+ggsave(sociableRewiringMod, filename = "sociableRewiringMod.png", width = 7, height = 4)
+
+# NET (REWIRED - BACK1)
+sociableNetMod <- full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "net") %>%
+  ggplot(aes(x = mod, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Net")
+sociableNetMod
+ggsave(sociableNetMod, filename = "sociableNetMod.png", width = 7, height = 4)
+```
+
+The results are similar for the clustering of the nodes, except that the deltas are more centered around zero. Intermediate values of clustering of the removed nodes show no change in the network-level measures after removal and rewiring. When the removed nodes are particularly spread out (i.e. negative modularity), network density decreased after their removal while mean distance and network modularity both increased. When the removed nodes are particularly clustered (i.e. positive modularity), network density increased after their removal and both mean distance and network modularity decreased. These results are largely consistent with my predictions, with the exception of the density prediction.
+
+## Rewiring rules
+
+```{r include = FALSE}
+unsociable <- vector(mode = "list", length = nRuns)
+for(i in 1:nRuns){
+  unsociable[[i]] <- runModel(N = 50, # Nodes in the network
+                              mnSocExp = mnSocExp,
+                              n.removed = 10,
+                              id = NULL,
+                              baseline.in = baseline.in,
+                              baseline.out = baseline.out,
+                              mod00 = mod00, 
+                              mod01 = mod01, 
+                              mod10 = mod10,
+                              mod11 = mod11,
+                              coefBereavement = -1)$graphs
+}
+
+# INFO ABOUT THE GLOBAL NETWORK MEASURES
+# Define functions for doing computations
+unsociable_densDF <- lapply(unsociable, function(x){
+  lapply(x, function(y){
+    edge_density(y)
+  }) %>%
+    unlist() %>%
+    as.data.frame() %>%
+    setNames(., "density") %>%
+    mutate(slice = 1:nrow(.))
+}) %>%
+  data.table::rbindlist(idcol = "run")
+
+unsociable_mdDF <- lapply(unsociable, function(x){
+  lapply(x, function(y){
+    mean_distance(y)
+  }) %>%
+    unlist() %>%
+    as.data.frame() %>%
+    setNames(., "meanDistance") %>%
+    mutate(slice = 1:nrow(.))
+}) %>%
+  data.table::rbindlist(idcol = "run")
+
+unsociable_moduDF <- lapply(unsociable, function(x){
+  clustered <- lapply(x, cluster_fast_greedy)
+  df <- data.frame(slice = 1:length(clustered),
+                   modularity = unlist(lapply(clustered, modularity)),
+                   nClusters = unlist(lapply(clustered, length)),
+                   nIndivs = unlist(lapply(x, function(x){length(V(x))})))
+  return(df)
+}) %>%
+  data.table::rbindlist(idcol = "run")
+
+# Combine all three
+unsociable_networkLevel <- left_join(unsociable_densDF, unsociable_mdDF, by = c("run", "slice")) %>%
+  left_join(unsociable_moduDF, by = c("run", "slice"))
+
+# NETWORK-LEVEL MEASURE DELTAS (before and rewiring)
+unsociable_deltas <- unsociable_networkLevel %>%
+  filter(slice %in% c(back1, removed, rewired)) %>%
+  group_by(run) %>%
+  summarize("Density1" = density[slice == removed]-density[slice == back1],
+            "Density2" = density[slice == rewired]-density[slice == removed],
+            "Density3" = density[slice == rewired]-density[slice == back1],
+            "Mean Distance1" = meanDistance[slice == removed]-meanDistance[slice == back1],
+            "Mean Distance2" = meanDistance[slice == rewired]-meanDistance[slice == removed],
+            "Mean Distance3" = meanDistance[slice == rewired]-meanDistance[slice == back1],
+            "Modularity1" = modularity[slice == removed]-modularity[slice == back1],
+            "Modularity2" = modularity[slice == rewired]-modularity[slice == removed],
+            "Modularity3" = modularity[slice == rewired]-modularity[slice == back1]) %>%
+  pivot_longer(cols = -c(run), names_to = "yMeasure", values_to = "yMeasureValue") %>%
+  mutate(change = stringr::str_extract(yMeasure, "[0-9]"),
+         yMeasure = stringr::str_remove(yMeasure, "[0-9]")) %>%
+  mutate(change = case_when(change == 1 ~ "removal",
+                            change == 2 ~ "rewiring",
+                            change == 3 ~ "net"))
+
+# INFO ABOUT THE REMOVED NODE(S)
+unsociable_removedInfo <- lapply(unsociable, function(x){
+  init <- V(x[[1]])$label
+  final <- V(x[[length(x)]])$label
+  removedNumbers <- which(!(init %in% final))
+  removedNames <- init[!(init %in% final)]
+  removedDegrees <- degree(x[["back1"]])[removedNumbers]
+  removedBetweennesses <- betweenness(x[["back1"]])[removedNumbers]
+  
+  # Calculate "the extent to which the removed nodes constitute their own cluster"
+  membershipVec <- as.vector(V(x[[1]]))
+  membershipVec[removedNumbers] <- 1
+  membershipVec[-removedNumbers] <- 2
+  # created a cluster membership vector, assigning each of the removed nodes to cluster "1" and each of the remaining nodes to cluster "2"
+  
+  mod <- modularity(x[["back1"]], membership = membershipVec)
+  
+  # Make edge list for calculating closenesses
+  el <- get.edgelist(x[["back1"]], names = TRUE) %>%
+    cbind(., 1) %>%
+    as_tibble() %>%
+    complete(V1 = 1:max(V(x[["back1"]])), V2 = 1:max(V(x[["back1"]])), fill = list(V3 = 0))
+  
+  ## calculate closenesses
+  closenesses <- as.data.frame(suppressWarnings(closeness_w(el, directed = FALSE, gconly = FALSE)))
+  removedClosenesses <- closenesses %>%
+    filter(node %in% removedNumbers)
+  
+  # Pairwise distance matrix for only the about-to-be-removed nodes
+  removedDistances <- distances(x[["back1"]])[removedNumbers, removedNumbers]
+  removedDistances[removedDistances == 0|is.infinite(removedDistances)] <- NA
+  removedDistances[lower.tri(removedDistances)] <- NA # consider only one triangle, since this is undirected
+  removedMeanDistance <- mean(removedDistances, na.rm = T)
+  
+  removedGraph <- subgraph(x[[back1]], vids = removedNumbers)
+  df <- data.frame(name = removedNames, 
+                   number = removedNumbers, 
+                   degree = removedDegrees,
+                   fullGraphDens = edge_density(x[["back1"]]),
+                   btwn = removedBetweennesses,
+                   dens = edge_density(removedGraph),
+                   meanDist = removedMeanDistance,
+                   mod = mod)
+  df <- df %>%
+    left_join(removedClosenesses, by = c("number" = "node"))
+  
+  return(df)
+}) %>%
+  data.table::rbindlist(idcol = "run") %>%
+  as.data.frame()
+
+# SUMMARIZE CHARACTERISTICS OF REMOVED NODE(S)
+unsociable_removedInfoSummary <- unsociable_removedInfo %>%
+  group_by(run) %>%
+  summarize(meanDeg = mean(degree, na.rm = T),
+            meanBtwn = mean(btwn, na.rm = T),
+            dens = dens[1],
+            mod = mod[1],
+            fullGraphDens = fullGraphDens[1],
+            meanDist = meanDist[1],
+            meanCloseness = mean(closeness, na.rm = T),
+            meanNormalizedCloseness = mean(n.closeness, na.rm = T))
+
+# COMBINE INDIVIDUAL AND NETWORK MEASURES
+unsociable_full <- unsociable_removedInfoSummary %>%
+  left_join(deltas_0.2, by = "run") %>%
+  mutate(label = case_when(yMeasure == "modu" ~ "\u0394 Modularity",
+                           yMeasure == "md" ~ "\u0394 Mean Distance",
+                           yMeasure == "dens" ~ "\u0394 Edge Density",
+                           TRUE ~ NA_character_))
+```
+
+### Centrality
+
+```{r echo = FALSE}
+# Set some common plot elements
+plotElements = list(geom_point(shape = 1, aes(col = yMeasure)),
+                    geom_smooth(method = "lm", aes(col = yMeasure)),
+                    scale_color_manual(values = c(densColor, mdColor, moduColor)),
+                    facet_wrap(~yMeasure, scales = "free", strip.position = "left"),
+                    theme_minimal(),
+                    theme(strip.placement = "outside",
+                          legend.position = "none",
+                          axis.title.x = element_text(size = 14),
+                          strip.text.y = element_text(size = 14)),
+                    theme(title = element_text(size = 22)),
+                    xlab("Centrality of removed nodes (mean degree)"),
+                    ylab(""))
+
+# REMOVAL (REMOVED - BACK1)
+unsociableRemovedDeg <- unsociable_full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "removal") %>%
+  ggplot(aes(x = meanDeg, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Removal")
+#unsociableRemovedDeg
+
+# REWIRING (REWIRED - REMOVED)
+unsociableRewiringDeg <- unsociable_full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "rewiring") %>%
+  ggplot(aes(x = meanDeg, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Rewiring")
+#unsociableRewiringDeg
+ggsave(unsociableRewiringDeg, filename = "unsociableRewiringDeg.png", width = 7, height = 4)
+
+# NET (REWIRED - BACK1)
+unsociableNetDeg <- unsociable_full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "net") %>%
+  ggplot(aes(x = meanDeg, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Net")
+unsociableNetDeg
+```
+
+When the `coefBereavement` is -1 (i.e. individuals become less sociable the more friends they lose), there is a notable lack of effect of the centrality of the removed individuals on the various network measures.
+
+### Clustering
+
+```{r echo = FALSE}
+# Set some common plot elements
+plotElements = list(geom_point(shape = 1, aes(col = yMeasure)),
+                    geom_smooth(method = "lm", aes(col = yMeasure)),
+                    scale_color_manual(values = c(densColor, mdColor, moduColor)),
+                    facet_wrap(~yMeasure, scales = "free", strip.position = "left"),
+                    theme_minimal(),
+                    theme(strip.placement = "outside",
+                          legend.position = "none",
+                          axis.title.x = element_text(size = 14),
+                          strip.text.y = element_text(size = 14)),
+                    xlab("Modularity of removed nodes"),
+                    ylab(""))
+
+# REMOVAL (REMOVED - BACK1)
+unsociableRemovedMod <- unsociable_full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "removal") %>%
+  ggplot(aes(x = mod, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Removal")
+#unsociableRemovedMod 
+
+# REWIRING (REWIRED - REMOVED)
+unsociableRewiringMod <- unsociable_full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "rewiring") %>%
+  ggplot(aes(x = mod, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Rewiring")
+#unsociableRewiringMod
+ggsave(unsociableRewiringMod, filename = "unsociableRewiringMod.png", width = 7, height = 4)
+
+# NET (REWIRED - BACK1)
+unsociableNetMod <- unsociable_full %>%
+  mutate(yMeasure = paste0("(delta) ", yMeasure)) %>%
+  filter(change == "net") %>%
+  ggplot(aes(x = mod, y = yMeasureValue))+
+  plotElements+
+  ggtitle("Net")
+unsociableNetMod
+```
+
+This also holds for clusteredness of the removed individuals. I observe slight negative relationships between changes in mean distance and modularity and the clusteredness of the removed nodes, but they are non-significant and, I think, not biologically significant either.
+
 # Discussion and future directions
+
+Most of my results (proportion of nodes removed, and the effect of node characteristics on network-level measures) confirmed my intuition about how networks should respond to multiple-node loss. The results of the rewiring process were much less intuitive, and as of writing this report, I am not entirely convinced that my code isn't somehow flawed---I don't understand why I observed such minuscule effects of rewiring in comparison to the magnitude of the change due to node removal.
+
+In general, I think the rewiring portion of my model needs the most work, especially since it is something I am particularly interested in understanding. Initial versions of this model focused on edges, rather than nodes, as the fundamental thing being manipulated. As such, I was able to directly encode second-degree rewiring as one hypothesis, by increasing the probability of edge formation between nodes that had both previously been connected to a lost node. Relatively recently, I shifted my model to focus more on individuals, with edge probabilities arising from the multiplication of sociality values. I still incorporated an edge-based history adjustment, but I couldn't figure out how to incorporate second-degree rewiring. Instead, I added `coefBereavement` to express the effect of social loss on individuals' inherent social probability, which would apply indiscriminately across all of the edges it might seek to form.
+
+In the future, I would like to think more deeply about how to encode second-degree rewiring, or more generally, how to adjust individuals' probabilities of interacting *with certain other individuals*, as opposed to their sociality in general. This would center the model more on individual social relationships.
