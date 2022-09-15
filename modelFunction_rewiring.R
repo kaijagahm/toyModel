@@ -15,10 +15,10 @@ runModel <- function(N = 50, # Number of nodes in the starting network. Must be 
                      mnSocExp = 0.3,
                      baseline.in = 20, # How many iterations of baseline dynamics to run before node removals.
                      baseline.out = 10, # How many iterations of baseline dynamics to run after node removals.
-                     mod00 = -0.2, 
-                     mod01 = 0.1, 
-                     mod10 = -0.1, 
-                     mod11 = 0.2,
+                     mod00 = -0.4, 
+                     mod01 = 0.2, 
+                     mod10 = 0.1, 
+                     mod11 = 0.3,
                      id = NULL,
                      coefBereavement = 1){ # beta distribution parameters derived from parameterizingTheModel.Rmd.)
   
